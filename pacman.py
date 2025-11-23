@@ -1,5 +1,4 @@
 import pygame
-import pygame
 from enum import Enum
 import os
 
@@ -12,6 +11,7 @@ VERMELHO = (255, 0, 0)
 
 TILE_SIZE = 32  # Tamanho do tile em pixels
 
+
 # Enum do jogo
 class estadoJogo(Enum):
     MENU = 0
@@ -21,9 +21,8 @@ class estadoJogo(Enum):
     DERROTA = 4
     RANKING = 5
 
-############
-#   TAD    #
-############
+
+# TAD para representar o mapa do jogo
 class Mapa:
     # Construtor da classe mapa que recebe o arquivo .txt
     def __init__(self, arquivo: str) -> None:
@@ -32,50 +31,55 @@ class Mapa:
         self.col = 0
         self.matriz = []
         self.posicaoInicialPacman = []  # Para guardar a posição inicial do Pacman
-        self.posicaoInicialFantasmas = [] # Para guardar as posições iniciais dos Fantasmas
+        self.posicaoInicialFantasmas = []  # Para guardar as posições iniciais dos Fantasmas
         self.carregarMapa(arquivo)
 
+    # Método para carregar o mapa a partir de um arquivo .txt
     def carregarMapa(self, arquivo: str) -> None:
-
         # Verifica se o arquivo existe
         if not os.path.exists(arquivo):
-            print(f"ERRO: O arquivo '{arquivo}' não foi encontrado no diretório.") # Debug
+            print(
+                f"ERRO: O arquivo '{arquivo}' não foi encontrado no diretório."
+            )  # Debug
             return None
 
         # Abertura e leitura do arquivo
         try:
-            with open(arquivo, 'r') as arq:
+            with open(arquivo, "r") as arq:
                 # Ler a primeira linha para pegar dimensoes
                 dim = arq.readline()
-                if dim:                         # Se a linha existir
+                if dim:  # Se a linha existir
                     dims = dim.strip().split()  # Remove espaços e separa os valores
-                    self.lin = int(dims[0])     # Guarda o primeiro valor como linha
-                    self.col = int(dims[1])     # Guarda o primeiro valor como linha
-                    print(f"Dimensões: {self.lin} linhas x {self.col} colunas") # Debug
+                    self.lin = int(dims[0])  # Guarda o primeiro valor como linha
+                    self.col = int(dims[1])  # Guarda o primeiro valor como linha
+                    print(f"Dimensões: {self.lin} linhas x {self.col} colunas")  # Debug
 
                 # Ler o restante do mapa linha a linha e limpar quebras de linha
                 for i, linha in enumerate(arq):
                     # O rstrsip remove apenas o \n a direita, isso evita apagar espaços
                     # propositais colocados nas bordas
-                    linhaLimpa = linha.rstrip('\n') 
+                    linhaLimpa = linha.rstrip("\n")
                     if not linhaLimpa:
                         continue
 
-                    #converter para lista para alterar índices
+                    # converter para lista para alterar índices
                     listaChars = list(linhaLimpa)
 
                     # Varredura de entidades
                     for j, char in enumerate(listaChars):
-                        if char == '<':
+                        if char == "<":
                             # Guarda posição inicial do Pacman
-                            self.posicaoInicialPacman = (j, i)  # Guarda a posição inicial do Pacman
+                            self.posicaoInicialPacman = (
+                                j,
+                                i,
+                            )  # Guarda a posição inicial do Pacman
                             # Substitui na matriz por ponto, considerando que Pacman começa sobre um ponto
-                            listaChars[j] = '.'
-                        elif char == 'F':
+                            listaChars[j] = "."
+                        elif char == "F":
                             # Guarda posição inicial do Fantasma
                             self.posicaoInicialFantasmas.append((j, i))
                             # Substitui na matriz por espaço vazio
-                            listaChars[j] = ' '
+                            listaChars[j] = " "
 
                     # Adiciona a linha sem os chars das entidades na matriz
                     self.matriz.append(listaChars)
@@ -83,18 +87,12 @@ class Mapa:
         except Exception as e:
             print(f"Erro ao ler o arquivo {e}")
 
-    # Método para exibir o mapa carregado (debug)
-    def exibir(self):
-        for linha in self.matriz:
-            print("".join(linha))
-
-    def checarParede(self, x: int, y: int) -> bool:
-        if self.matriz[x][y] == '#':
-            return True
-        return False
+    # Metodo para atualizar o conteúdo da matriz do mapa
+    def atualizarConteudo(self, x: int, y: int, novoChar: str) -> None:
+        self.matriz[y][x] = novoChar
 
 
-
+# TAD para representar as entidades do jogo
 class Entidade:
     # Construtor da entidade
     def __init__(self, x: int, y: int) -> None:
@@ -104,19 +102,42 @@ class Entidade:
         self.xInicio = x
         self.yInicio = y
 
-# Classes específicas utilizando herança
+    # Metodo para verificar se a entidade pode se mover para a posição (x, y)
+    def podeMover(self, mapa: Mapa, x: int, y: int) -> bool:
+        if x < 0 or x >= mapa.col or y < 0 or y >= mapa.lin:
+            return False  # Fora dos limites do mapa
+        if mapa.matriz[y][x] == "#":
+            return False  # Paredes bloqueiam o movimento
+        return True
+
+
+# Subclasse específica para o Pacman
 class Pacman(Entidade):
     def __init__(self, x: int, y: int) -> None:
         super().__init__(x, y)
-        self.tempoInvencivel = 0    # 0 indica que está vulnerável
+        self.tempoInvencivel = 0  # 0 indica que está vulnerável
         self.vidas = 3
         self.pontos = 0
 
+    # Método que gerencia o movimento do Pacman
+    def move(self, mapa: Mapa, direcao: str) -> None:
+        if direcao == pygame.K_UP and super().podeMover(mapa, self.x, self.y - 1):
+            self.y -= 1
+        if direcao == pygame.K_DOWN and super().podeMover(mapa, self.x, self.y + 1):
+            self.y += 1
+        if direcao == pygame.K_LEFT and super().podeMover(mapa, self.x - 1, self.y):
+            self.x -= 1
+        if direcao == pygame.K_RIGHT and super().podeMover(mapa, self.x + 1, self.y):
+            self.x += 1
+
+
+# Subclasse específica para os Fantasmas
 class Fantasma(Entidade):
     def __init__(self, x: int, y: int) -> None:
         super().__init__(x, y)
         self.tempoLivre = 0  # 0 indica que está preso na casa dos fantasmas
         self.tempoAssustado = 0  # 0 indica que está normal
+
 
 class Jogo:
     def __init__(self) -> None:
@@ -131,10 +152,11 @@ class Jogo:
         pygame.display.set_caption("Pacman")
         self.clock = pygame.time.Clock()
 
-        # Inicia as entidades pegando as coordenadas lidas durante o carregamento do mapa e cria os objetos
+        # Instancia o objeto pacman com as coordenadas lidas durante o carregamento do mapa
         px, py = self.mapa.posicaoInicialPacman
         self.pacman = Pacman(px, py)
 
+        # Instancia os fantasmas nas posições iniciais lidas durante o carregamento do mapa
         self.fantasmas = []
         for fx, fy in self.mapa.posicaoInicialFantasmas:
             fantasma = Fantasma(fx, fy)
@@ -150,23 +172,39 @@ class Jogo:
                 x = j * TILE_SIZE
                 y = i * TILE_SIZE
 
-                if char == '#':
-                    pygame.draw.rect(self.tela, AZUL, (x, y, TILE_SIZE, TILE_SIZE)) # Parede                # Desenha a parede
-                elif char == '.':
-                    pygame.draw.circle(self.tela, BRANCO, (x + TILE_SIZE // 2, y + TILE_SIZE // 2), 4)      # Desenha o ponto
-                elif char == '0':
-                    pygame.draw.circle(self.tela, BRANCO, (x + TILE_SIZE // 2, y + TILE_SIZE // 2), 8)      # Desenha o power-up
+                if char == "#":
+                    pygame.draw.rect(
+                        self.tela, AZUL, (x, y, TILE_SIZE, TILE_SIZE)
+                    )  # Parede                # Desenha a parede
+                elif char == ".":
+                    pygame.draw.circle(
+                        self.tela, BRANCO, (x + TILE_SIZE // 2, y + TILE_SIZE // 2), 4
+                    )  # Desenha o ponto
+                elif char == "0":
+                    pygame.draw.circle(
+                        self.tela, BRANCO, (x + TILE_SIZE // 2, y + TILE_SIZE // 2), 8
+                    )  # Desenha o power-up
 
         # Desenha o Pacman
         pacman_x = self.pacman.x * TILE_SIZE
         pacman_y = self.pacman.y * TILE_SIZE
-        pygame.draw.circle(self.tela, AMARELO, (pacman_x + TILE_SIZE // 2, pacman_y + TILE_SIZE // 2), TILE_SIZE // 2)
+        pygame.draw.circle(
+            self.tela,
+            AMARELO,
+            (pacman_x + TILE_SIZE // 2, pacman_y + TILE_SIZE // 2),
+            TILE_SIZE // 2,
+        )
 
         # Desenha os Fantasmas
         for fantasma in self.fantasmas:
             fantasma_x = fantasma.x * TILE_SIZE
             fantasma_y = fantasma.y * TILE_SIZE
-            pygame.draw.circle(self.tela, VERMELHO, (fantasma_x + TILE_SIZE // 2, fantasma_y + TILE_SIZE // 2), TILE_SIZE // 2)
+            pygame.draw.circle(
+                self.tela,
+                VERMELHO,
+                (fantasma_x + TILE_SIZE // 2, fantasma_y + TILE_SIZE // 2),
+                TILE_SIZE // 2,
+            )
 
         pygame.display.flip()
 
@@ -175,13 +213,17 @@ class Jogo:
         rodando = True
         while rodando:
             for evento in pygame.event.get():
+                if evento.type == pygame.KEYDOWN:
+                    self.pacman.move(self.mapa, evento.key)
                 if evento.type == pygame.QUIT:
                     rodando = False
+                    pygame.quit()
 
             self.desenhar()
             self.clock.tick(60)
 
         pygame.quit()
+
 
 #########################################
 #       FUNÇÃO PRINCIPAL DO JOGO        #
@@ -190,4 +232,3 @@ if __name__ == "__main__":
     pygame.init()
     jogo = Jogo()
     jogo.executar()
-

@@ -143,7 +143,7 @@ class Jogo:
     def __init__(self) -> None:
         self.estado = estadoJogo.MENU
         # Carrega o mapa
-        self.mapa = Mapa("fase1.txt")
+        self.mapa = Mapa("fase2.txt")
 
         # Configuração da tela
         self.larguraTela = self.mapa.col * TILE_SIZE

@@ -157,7 +157,7 @@ class Entidade:
         self.rect.y += self.direcao[1] * self.speed
 
         # Atualiza a referência da grade para lógica do jogo
-        self.x_grid, self.y_grid = self.getPosGrad()
+        self.xGrid, self.yGrid = self.getPosGrad()
 
 
 # Subclasse específica para o Pacman
@@ -207,7 +207,7 @@ class Fantasma(Entidade):
     # Construtor do objeto Fantasma
     def __init__(self, x: int, y: int) -> None:
         super().__init__(x, y)
-        self.tempoLivre = 0  # 0 indica que está preso na casa dos fantasmas
+        self.tempoPreso = 300  # 300 frames preso na casa dos fantasmas
         self.tempoAssustado = 0  # 0 indica que está normal
         self.speed = VELOCIDADE - 1  # Fantasmas são um pouco mais lentos que o Pacman
 
@@ -260,9 +260,9 @@ class Fantasma(Entidade):
 
     # Atualização do movimento do fantasma
     def update(self, mapa: Mapa, pacman: Pacman) -> None:
-        # Verifica se está livre para se mover
-        if self.tempoLivre > 0:
-            self.tempoLivre -= 1
+        # Verifica se está preso
+        if self.tempoPreso > 0:
+            self.tempoPreso -= 1
             return  # Ainda preso na casa dos fantasmas
 
         # Verifica se está centralizado para decidir o próximo movimento
@@ -273,7 +273,7 @@ class Fantasma(Entidade):
                 px, py = prox
                 dx = px - self.xGrid
                 dy = py - self.yGrid
-                self.dreicao = (dx, dy)
+                self.direcao = (dx, dy)
             else:
                 self.direcao = (0, 0)  # Não encontrou caminho
         self.mover_fisica()

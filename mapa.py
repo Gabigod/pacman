@@ -64,7 +64,6 @@ class Mapa:
                         elif char == "0":
                             print(f"POWER-UP ENCONTRADO EM: ({j}, {linha_index})")
                             self.posicaoPowerUp = (j, linha_index)
-                            listaChars[j] = "."  # Fica como ponto no mapa
 
                     # Linha final sem entidades
                     self.matriz.append(listaChars)

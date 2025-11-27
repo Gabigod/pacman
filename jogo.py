@@ -5,6 +5,7 @@ import pygame
 
 
 class Jogo:
+    # Inicializa o jogo
     def __init__(self) -> None:
         self.estado = cfg.estadoJogo.MENU
         # Carrega o mapa
@@ -17,9 +18,17 @@ class Jogo:
         pygame.display.set_caption("Pacman")
         self.clock = pygame.time.Clock()
 
+        # Tenta carregar os sprites
+        try:
+            self.folhaSprites = pygame.image.load("Sprites.png").convert_alpha()
+            print("Sprites carregados com sucesso.")
+        except pygame.error as e:
+            print(f"Erro ao carregar sprites: {e}")
+            self.folhaSprites = None
+
         # Instancia o objeto pacman com as coordenadas lidas durante o carregamento do mapa
         px, py = self.mapa.posicaoInicialPacman
-        self.pacman = Pacman(px, py)
+        self.pacman = Pacman(px, py, self.folhaSprites)
 
         # Instancia os fantasmas nas posições iniciais lidas durante o carregamento do mapa
         self.fantasmas = []
@@ -27,13 +36,14 @@ class Jogo:
         self.powerupTimer = 0
 
         for fx, fy in self.mapa.posicaoInicialFantasmas:
-            fantasma = Fantasma(fx, fy)
+            fantasma = Fantasma(fx, fy, self.folhaSprites)
             self.fantasmas.append(fantasma)
 
     # Método para desenhar o estado atual do jogo
     def desenhar(self) -> None:
         self.tela.fill(cfg.PRETO)
 
+        # Desenha o mapa
         for i in range(self.mapa.lin):
             for j in range(self.mapa.col):
                 char = self.mapa.matriz[i][j]
@@ -61,19 +71,28 @@ class Jogo:
                     )
 
         # Desenha o Pacman
-        pygame.draw.circle(
-            self.tela, cfg.AMARELO, self.pacman.rect.center, cfg.TILE_SIZE // 2
-        )
+        if self.pacman.imagem:  # Se carregou a imagem do Pacman
+            self.tela.blit(self.pacman.imagem, self.pacman.rect)  # Desenha com a imagem
+        else:
+            pygame.draw.circle(
+                self.tela,
+                cfg.AMARELO,
+                self.pacman.rect.center,
+                cfg.TILE_SIZE // 2,  # Se não, desenha um círculo amarelo
+            )
 
         # Desenha todos os fantasmas
         for fantasma in self.fantasmas:
-            corFantasma = cfg.AZUL if fantasma.assustado else cfg.VERMELHO
-            pygame.draw.circle(
-                self.tela,
-                corFantasma,
-                fantasma.rect.center,
-                cfg.TILE_SIZE // 2,
-            )
+            if fantasma.imagem:
+                self.tela.blit(fantasma.imagem, fantasma.rect)
+            else:
+                corFantasma = cfg.AZUL if fantasma.assustado else cfg.VERMELHO
+                pygame.draw.circle(
+                    self.tela,
+                    corFantasma,
+                    fantasma.rect.center,
+                    cfg.TILE_SIZE // 2,
+                )
 
         pygame.display.flip()
 

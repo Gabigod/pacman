@@ -1,4 +1,4 @@
-from config import TILE_SIZE, VELOCIDADE
+from config import TILE_SIZE, VELOCIDADE, PRETO
 from mapa import Mapa
 from collections import deque  # Necessario para o BFS
 import pygame
@@ -20,14 +20,18 @@ class Entidade:
         self.direcao = (0, 0)  # Vetor que aponta o movimento (1,0) é direita
         self.speed = VELOCIDADE
 
+        # Atributos visuais
+        self.imagem = None
+        self.corFallback = (255, 0, 0)  # Cor vermelha como fallback
+
     # Reorna a posição atual na grade baseada no centro do rect
-    def getPosGrad(self):
+    def getPosGrad(self) -> int:
         cx = self.rect.centerx // TILE_SIZE
         cy = self.rect.centery // TILE_SIZE
         return cx, cy
 
     # Verifica se a entidade está perfeitamente centralizada no tile
-    def esta_centralizado(self):
+    def esta_centralizado(self) -> bool:
         return (self.rect.x % TILE_SIZE == 0) and (self.rect.y % TILE_SIZE == 0)
 
     # Metodo para verificar se a entidade pode se mover para a posição (x, y)
@@ -39,22 +43,36 @@ class Entidade:
         return True
 
     # Movimento básico contínuo
-    def mover_fisica(self):
+    def mover_fisica(self) -> None:
         self.rect.x += self.direcao[0] * self.speed
         self.rect.y += self.direcao[1] * self.speed
 
         # Atualiza a referência da grade para lógica do jogo
         self.xGrid, self.yGrid = self.getPosGrad()
 
+    # Recorta e retorna uma sprite da folha de sprites.
+    def getSprite(self, sheet, x, y, w=16, h=16):
+        if sheet is None:
+            return None
+        sprite = pygame.Surface((w, h), pygame.SRCALPHA)
+        sprite.blit(sheet, (0, 0), (x, y, w, h))
+        sprite.set_colorkey(PRETO)  # Define o preto como transparente
+        return pygame.transform.scale(sprite, (TILE_SIZE, TILE_SIZE))
+
 
 # Subclasse específica para o Pacman
 class Pacman(Entidade):
-    def __init__(self, x: int, y: int) -> None:
+    def __init__(self, x: int, y: int, sheet=None) -> None:
         super().__init__(x, y)
         self.tempoInvencivel = 0  # 0 indica que está vulnerável
         self.vidas = 3
         self.pontos = 0
         self.proximaDirecao = (0, 0)  # Direção que o jogador quer ir
+        self.corFallback = (255, 255, 0)  # Cor amarela como fallback
+
+        # Carrega a sprite do Pacman
+        self.spriteOriginal = self.getSprite(sheet, 16, 0)
+        self.imagem = self.spriteOriginal  # TO-DO: Animação futura
 
     # Chamado pelo evento de teclado para definir a direção desejada
     def processarEvento(self, key):
@@ -88,16 +106,34 @@ class Pacman(Entidade):
         # Move o Pacman fisicamente
         self.mover_fisica()
 
+        # Atualiza a rotação da sprite baseada na direção
+        if self.spriteOriginal:
+            angulo = 0
+            if self.direcao == (-1, 0):
+                angulo = 180  # Esquerda
+            elif self.direcao == (0, -1):
+                angulo = 90  # Cima
+            elif self.direcao == (0, 1):
+                angulo = 270  # Baixo
+            self.imagem = pygame.transform.rotate(
+                self.spriteOriginal, angulo
+            )  # Gira a partir da original conforme o angulo
+
 
 # Subclasse específica para os Fantasmas
 class Fantasma(Entidade):
     # Construtor do objeto Fantasma
-    def __init__(self, x: int, y: int) -> None:
+    def __init__(self, x: int, y: int, sheet=None) -> None:
         super().__init__(x, y)
         self.tempoPreso = 300  # 300 frames preso na casa dos fantasmas
         self.assustado = False  # Flag para estado assustado
         self.tempoAssustado = 0  # 0 indica que está normal
         self.speed = VELOCIDADE - 1  # Fantasmas são um pouco mais lentos que o Pacman
+
+        # Carrega as sprites específicas dos fantasmas
+        self.spriteNormal = self.getSprite(sheet, 0, 64)  # Vermelho
+        self.spriteAssustado = self.getSprite(sheet, 128, 64)  # Azul (assustado)
+        self.imagem = self.spriteNormal
 
     # Implementação do algoritmo BFS para encontrar o caminho até o pacman
     def bfsProx(self, mapa: Mapa, alvoX: int, alvoY: int) -> None:

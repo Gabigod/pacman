@@ -274,9 +274,9 @@ class Fantasma(Entidade):
 
     # Atualização do movimento do fantasma
     def update(self, mapa: Mapa, pacman: Pacman) -> None:
-        # Verifica se está livre para se mover
-        if self.tempoLivre > 0:
-            self.tempoLivre -= 1
+        # Verifica se está preso
+        if self.tempoPreso > 0:
+            self.tempoPreso -= 1
             return  # Ainda preso na casa dos fantasmas
 
         # Verifica se está centralizado para decidir o próximo movimento

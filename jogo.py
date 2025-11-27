@@ -1,13 +1,4 @@
-from config import (
-    TILE_SIZE,
-    VELOCIDADE,
-    PRETO,
-    BRANCO,
-    AMARELO,
-    VERMELHO,
-    AZUL,
-    estadoJogo,
-)
+import config as cfg
 from mapa import Mapa
 from entidades import Pacman, Fantasma
 import pygame
@@ -15,13 +6,13 @@ import pygame
 
 class Jogo:
     def __init__(self) -> None:
-        self.estado = estadoJogo.MENU
+        self.estado = cfg.estadoJogo.MENU
         # Carrega o mapa
         self.mapa = Mapa("fases/fase1.txt")
 
         # Configuração da tela
-        self.larguraTela = self.mapa.col * TILE_SIZE
-        self.alturaTela = self.mapa.lin * TILE_SIZE
+        self.larguraTela = self.mapa.col * cfg.TILE_SIZE
+        self.alturaTela = self.mapa.lin * cfg.TILE_SIZE
         self.tela = pygame.display.set_mode((self.larguraTela, self.alturaTela))
         pygame.display.set_caption("Pacman")
         self.clock = pygame.time.Clock()
@@ -41,37 +32,47 @@ class Jogo:
 
     # Método para desenhar o estado atual do jogo
     def desenhar(self) -> None:
-        self.tela.fill(PRETO)
+        self.tela.fill(cfg.PRETO)
 
         for i in range(self.mapa.lin):
             for j in range(self.mapa.col):
                 char = self.mapa.matriz[i][j]
 
-                x = j * TILE_SIZE
-                y = i * TILE_SIZE
+                x = j * cfg.TILE_SIZE
+                y = i * cfg.TILE_SIZE
 
                 if char == "#":
-                    pygame.draw.rect(self.tela, AZUL, (x, y, TILE_SIZE, TILE_SIZE))
+                    pygame.draw.rect(
+                        self.tela, cfg.AZUL, (x, y, cfg.TILE_SIZE, cfg.TILE_SIZE)
+                    )
                 elif char == ".":
                     pygame.draw.circle(
-                        self.tela, BRANCO, (x + TILE_SIZE // 2, y + TILE_SIZE // 2), 4
+                        self.tela,
+                        cfg.BRANCO,
+                        (x + cfg.TILE_SIZE // 2, y + cfg.TILE_SIZE // 2),
+                        4,
                     )
                 elif char == "0":
                     pygame.draw.circle(
-                        self.tela, BRANCO, (x + TILE_SIZE // 2, y + TILE_SIZE // 2), 8
+                        self.tela,
+                        cfg.BRANCO,
+                        (x + cfg.TILE_SIZE // 2, y + cfg.TILE_SIZE // 2),
+                        8,
                     )
 
         # Desenha o Pacman
-        pygame.draw.circle(self.tela, AMARELO, self.pacman.rect.center, TILE_SIZE // 2)
+        pygame.draw.circle(
+            self.tela, cfg.AMARELO, self.pacman.rect.center, cfg.TILE_SIZE // 2
+        )
 
         # Desenha todos os fantasmas
         for fantasma in self.fantasmas:
-            corFantasma = AZUL if fantasma.assustado else VERMELHO
+            corFantasma = cfg.AZUL if fantasma.assustado else cfg.VERMELHO
             pygame.draw.circle(
                 self.tela,
                 corFantasma,
                 fantasma.rect.center,
-                TILE_SIZE // 2,
+                cfg.TILE_SIZE // 2,
             )
 
         pygame.display.flip()
@@ -104,10 +105,10 @@ class Jogo:
                     if fantasma.assustado:
                         # Pacman come o fantasma
                         self.pacman.pontos += 200
-                        fantasma.rect.x = fantasma.xInicio * TILE_SIZE
-                        fantasma.rect.y = fantasma.yInicio * TILE_SIZE
+                        fantasma.rect.x = fantasma.xInicio * cfg.TILE_SIZE
+                        fantasma.rect.y = fantasma.yInicio * cfg.TILE_SIZE
                         fantasma.assustado = False
-                        fantasma.speed = VELOCIDADE - 1
+                        fantasma.tempoPreso = 150  # Fica preso por 150 frames
                     else:
                         print("Game Over!")
                         rodando = False
@@ -141,7 +142,7 @@ class Jogo:
                     self.powerupAtivo = False
                     for f in self.fantasmas:
                         f.assustado = False
-                        f.speed = VELOCIDADE - 1  # velocidade normal
+                        f.speed = cfg.VELOCIDADE - 1  # velocidade normal
 
             self.desenhar()
             self.clock.tick(60)

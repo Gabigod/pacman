@@ -24,7 +24,6 @@ class estadoJogo(Enum):
     RANKING = 5
 
 
-
 # TAD para representar o mapa do jogo
 class Mapa:
     # Construtor da classe mapa que recebe o arquivo .txt
@@ -33,14 +32,13 @@ class Mapa:
         self.lin = 0
         self.col = 0
         self.matriz = []
-        self.posicaoInicialPacman = None       # Posição inicial do Pacman
-        self.posicaoInicialFantasmas = []      # Lista de fantasmas
-        self.posicaoPowerUp = None             # Power-up (0)
+        self.posicaoInicialPacman = None  # Posição inicial do Pacman
+        self.posicaoInicialFantasmas = []  # Lista de fantasmas
+        self.posicaoPowerUp = None  # Power-up (0)
         self.carregarMapa(arquivo)
 
     # Método para carregar o mapa a partir de um arquivo .txt
     def carregarMapa(self, arquivo: str) -> None:
-
         # Reset das estruturas
         self.posicaoInicialPacman = None
         self.posicaoInicialFantasmas = []
@@ -54,7 +52,6 @@ class Mapa:
 
         try:
             with open(arquivo, "r", encoding="utf-8") as arq:
-
                 # Ler primeira linha com dimensões
                 dim = arq.readline()
                 if dim:
@@ -74,7 +71,6 @@ class Mapa:
 
                     # Analisa cada caractere da linha
                     for j, char in enumerate(listaChars):
-
                         # PACMAN (4 direções possíveis no TXT)
                         if char in ["<", ">", "^", "v"]:
                             print(f"PACMAN ENCONTRADO EM: ({j}, {linha_index})")
@@ -99,7 +95,6 @@ class Mapa:
 
         except Exception as e:
             print(f"Erro ao ler o arquivo: {e}")
-
 
     # Método que recebe a posição (x,y) do mapa e retorna uma lista de adjancência dos vizinhos possíveis de se visitar
     def vizinhos(self, x: int, y: int) -> list:
@@ -172,7 +167,6 @@ class Entidade:
         self.xGrid, self.yGrid = self.getPosGrad()
 
 
-
 # Subclasse específica para o Pacman
 class Pacman(Entidade):
     def __init__(self, x: int, y: int) -> None:
@@ -220,8 +214,8 @@ class Fantasma(Entidade):
     # Construtor do objeto Fantasma
     def __init__(self, x: int, y: int) -> None:
         super().__init__(x, y)
-        self.tempoLivre = 0  # 0 indica que está preso na casa dos fantasmas
-        self.assustado = False #
+        self.tempoPreso = 300  # 300 frames preso na casa dos fantasmas
+        self.assustado = False  # Flag para estado assustado
         self.tempoAssustado = 0  # 0 indica que está normal
         self.speed = VELOCIDADE - 1  # Fantasmas são um pouco mais lentos que o Pacman
 
@@ -289,7 +283,6 @@ class Fantasma(Entidade):
             else:
                 prox = self.bfsProx(mapa, pacman.xGrid, pacman.yGrid)
 
-
             if prox:
                 px, py = prox
                 dx = px - self.xGrid
@@ -333,7 +326,7 @@ class Jogo:
         for i in range(self.mapa.lin):
             for j in range(self.mapa.col):
                 char = self.mapa.matriz[i][j]
-            
+
                 x = j * TILE_SIZE
                 y = i * TILE_SIZE
 
@@ -360,8 +353,6 @@ class Jogo:
                 fantasma.rect.center,
                 TILE_SIZE // 2,
             )
-
-
 
         pygame.display.flip()
 
@@ -400,7 +391,6 @@ class Jogo:
                     else:
                         print("Game Over!")
                         rodando = False
-
 
             # Lógica de comer pontos (baseada na grade)
             if self.pacman.esta_centralizado():

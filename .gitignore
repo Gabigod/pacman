@@ -1,2 +1,4 @@
 # ignore all PDF files
 *.pdf
+# ignora os arquivos compilados do Python
+*.pyc

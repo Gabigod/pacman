@@ -24,6 +24,7 @@ class estadoJogo(Enum):
     RANKING = 5
 
 
+
 # TAD para representar o mapa do jogo
 class Mapa:
     # Construtor da classe mapa que recebe o arquivo .txt
@@ -32,62 +33,73 @@ class Mapa:
         self.lin = 0
         self.col = 0
         self.matriz = []
-        self.posicaoInicialPacman = []  # Para guardar a posição inicial do Pacman
-        self.posicaoInicialFantasmas = []  # Para guardar as posições iniciais dos Fantasmas
+        self.posicaoInicialPacman = None       # Posição inicial do Pacman
+        self.posicaoInicialFantasmas = []      # Lista de fantasmas
+        self.posicaoPowerUp = None             # Power-up (0)
         self.carregarMapa(arquivo)
 
     # Método para carregar o mapa a partir de um arquivo .txt
     def carregarMapa(self, arquivo: str) -> None:
+
+        # Reset das estruturas
+        self.posicaoInicialPacman = None
+        self.posicaoInicialFantasmas = []
+        self.posicaoPowerUp = None
+        self.matriz = []
+
         # Verifica se o arquivo existe
         if not os.path.exists(arquivo):
-            print(
-                f"ERRO: O arquivo '{arquivo}' não foi encontrado no diretório."
-            )  # Debug
+            print(f"ERRO: O arquivo '{arquivo}' não foi encontrado.")
             return None
 
-        # Abertura e leitura do arquivo
         try:
-            with open(arquivo, "r") as arq:
-                # Ler a primeira linha para pegar dimensoes
-                dim = arq.readline()
-                if dim:  # Se a linha existir
-                    dims = dim.strip().split()  # Remove espaços e separa os valores
-                    self.lin = int(dims[0])  # Guarda o primeiro valor como linha
-                    self.col = int(dims[1])  # Guarda o primeiro valor como linha
-                    print(f"Dimensões: {self.lin} linhas x {self.col} colunas")  # Debug
+            with open(arquivo, "r", encoding="utf-8") as arq:
 
-                # Ler o restante do mapa linha a linha e limpar quebras de linha
-                for i, linha in enumerate(arq):
-                    # O rstrsip remove apenas o \n a direita, isso evita apagar espaços
-                    # propositais colocados nas bordas
+                # Ler primeira linha com dimensões
+                dim = arq.readline()
+                if dim:
+                    dims = dim.strip().split()
+                    self.lin = int(dims[0])
+                    self.col = int(dims[1])
+                    print(f"Dimensões do mapa: {self.lin} x {self.col}")
+
+                # Leitura das linhas seguintes
+                linha_index = 0
+                for linha in arq:
                     linhaLimpa = linha.rstrip("\n")
                     if not linhaLimpa:
                         continue
 
-                    # converter para lista para alterar índices
                     listaChars = list(linhaLimpa)
 
-                    # Varredura de entidades
+                    # Analisa cada caractere da linha
                     for j, char in enumerate(listaChars):
-                        if char == "<":
-                            # Guarda posição inicial do Pacman
-                            self.posicaoInicialPacman = (
-                                j,
-                                i,
-                            )  # Guarda a posição inicial do Pacman
-                            # Substitui na matriz por ponto, considerando que Pacman começa sobre um ponto
-                            listaChars[j] = "."
-                        elif char == "F":
-                            # Guarda posição inicial do Fantasma
-                            self.posicaoInicialFantasmas.append((j, i))
-                            # Substitui na matriz por espaço vazio
-                            listaChars[j] = " "
 
-                    # Adiciona a linha sem os chars das entidades na matriz
+                        # PACMAN (4 direções possíveis no TXT)
+                        if char in ["<", ">", "^", "v"]:
+                            print(f"PACMAN ENCONTRADO EM: ({j}, {linha_index})")
+                            self.posicaoInicialPacman = (j, linha_index)
+                            listaChars[j] = "."  # Pacman começa sobre um ponto
+
+                        # FANTASMA
+                        elif char == "F":
+                            print(f"FANTASMA ENCONTRADO EM: ({j}, {linha_index})")
+                            self.posicaoInicialFantasmas.append((j, linha_index))
+                            listaChars[j] = " "  # Fantasma não é chão nem ponto
+
+                        # POWER-UP (o caractere '0')
+                        elif char == "0":
+                            print(f"POWER-UP ENCONTRADO EM: ({j}, {linha_index})")
+                            self.posicaoPowerUp = (j, linha_index)
+                            listaChars[j] = "."  # Fica como ponto no mapa
+
+                    # Linha final sem entidades
                     self.matriz.append(listaChars)
+                    linha_index += 1
 
         except Exception as e:
-            print(f"Erro ao ler o arquivo {e}")
+            print(f"Erro ao ler o arquivo: {e}")
+
 
     # Método que recebe a posição (x,y) do mapa e retorna uma lista de adjancência dos vizinhos possíveis de se visitar
     def vizinhos(self, x: int, y: int) -> list:
@@ -157,7 +169,8 @@ class Entidade:
         self.rect.y += self.direcao[1] * self.speed
 
         # Atualiza a referência da grade para lógica do jogo
-        self.x_grid, self.y_grid = self.getPosGrad()
+        self.xGrid, self.yGrid = self.getPosGrad()
+
 
 
 # Subclasse específica para o Pacman
@@ -208,6 +221,7 @@ class Fantasma(Entidade):
     def __init__(self, x: int, y: int) -> None:
         super().__init__(x, y)
         self.tempoLivre = 0  # 0 indica que está preso na casa dos fantasmas
+        self.assustado = False #
         self.tempoAssustado = 0  # 0 indica que está normal
         self.speed = VELOCIDADE - 1  # Fantasmas são um pouco mais lentos que o Pacman
 
@@ -267,13 +281,20 @@ class Fantasma(Entidade):
 
         # Verifica se está centralizado para decidir o próximo movimento
         if self.esta_centralizado():
-            prox = self.bfsProx(mapa, pacman.xGrid, pacman.yGrid)
+            if self.assustado:
+                # inversão do alvo → fugir do Pacman
+                alvoX = (self.xGrid * 2) - pacman.xGrid
+                alvoY = (self.yGrid * 2) - pacman.yGrid
+                prox = self.bfsProx(mapa, alvoX, alvoY)
+            else:
+                prox = self.bfsProx(mapa, pacman.xGrid, pacman.yGrid)
+
 
             if prox:
                 px, py = prox
                 dx = px - self.xGrid
                 dy = py - self.yGrid
-                self.dreicao = (dx, dy)
+                self.direcao = (dx, dy)
             else:
                 self.direcao = (0, 0)  # Não encontrou caminho
         self.mover_fisica()
@@ -298,6 +319,9 @@ class Jogo:
 
         # Instancia os fantasmas nas posições iniciais lidas durante o carregamento do mapa
         self.fantasmas = []
+        self.powerupAtivo = False
+        self.powerupTimer = 0
+
         for fx, fy in self.mapa.posicaoInicialFantasmas:
             fantasma = Fantasma(fx, fy)
             self.fantasmas.append(fantasma)
@@ -309,6 +333,7 @@ class Jogo:
         for i in range(self.mapa.lin):
             for j in range(self.mapa.col):
                 char = self.mapa.matriz[i][j]
+            
                 x = j * TILE_SIZE
                 y = i * TILE_SIZE
 
@@ -326,14 +351,17 @@ class Jogo:
         # Desenha o Pacman
         pygame.draw.circle(self.tela, AMARELO, self.pacman.rect.center, TILE_SIZE // 2)
 
-        # Desenha os Fantasmas
+        # Desenha todos os fantasmas
         for fantasma in self.fantasmas:
+            corFantasma = AZUL if fantasma.assustado else VERMELHO
             pygame.draw.circle(
                 self.tela,
-                VERMELHO,
+                corFantasma,
                 fantasma.rect.center,
                 TILE_SIZE // 2,
             )
+
+
 
         pygame.display.flip()
 
@@ -362,17 +390,48 @@ class Jogo:
                 hitbox_fantasma = fantasma.rect.inflate(-10, -10)
 
                 if hitbox_pacman.colliderect(hitbox_fantasma):
-                    print("Game Over!")
-                    # Reiniciar posições ou encerrar
-                    rodando = False
+                    if fantasma.assustado:
+                        # Pacman come o fantasma
+                        self.pacman.pontos += 200
+                        fantasma.rect.x = fantasma.xInicio * TILE_SIZE
+                        fantasma.rect.y = fantasma.yInicio * TILE_SIZE
+                        fantasma.assustado = False
+                        fantasma.speed = VELOCIDADE - 1
+                    else:
+                        print("Game Over!")
+                        rodando = False
+
 
             # Lógica de comer pontos (baseada na grade)
             if self.pacman.esta_centralizado():
                 px, py = self.pacman.getPosGrad()
                 item = self.mapa.matriz[py][px]
-                if item == "." or item == "0":
-                    self.mapa.matriz[py][px] = " "  # Remove o ponto
+
+                if item == ".":
+                    self.mapa.matriz[py][px] = " "
                     self.pacman.pontos += 10
+
+                elif item == "0":  # POWERUP
+                    self.mapa.matriz[py][px] = " "
+                    self.pacman.pontos += 50
+
+                    # Ativa powerup
+                    self.powerupAtivo = True
+                    self.powerupTimer = 8 * 60  # 8 segundos a 60 FPS
+
+                    # Deixa todos os fantasmas assustados
+                    for f in self.fantasmas:
+                        f.assustado = True
+                        f.speed = 1  # mais lentos
+
+            # Timer do powerup
+            if self.powerupAtivo:
+                self.powerupTimer -= 1
+                if self.powerupTimer <= 0:
+                    self.powerupAtivo = False
+                    for f in self.fantasmas:
+                        f.assustado = False
+                        f.speed = VELOCIDADE - 1  # velocidade normal
 
             self.desenhar()
             self.clock.tick(60)

@@ -18,6 +18,9 @@ class Jogo:
         pygame.display.set_caption("Pacman")
         self.clock = pygame.time.Clock()
 
+        # Cria uma fonte do sistema. None usa a padrão, tamanho 28.
+        self.fonte = pygame.font.Font(None, 28)
+
         # Tenta carregar os sprites
         try:
             self.folhaSprites = pygame.image.load("Sprites.png").convert_alpha()
@@ -93,6 +96,19 @@ class Jogo:
                     fantasma.rect.center,
                     cfg.TILE_SIZE // 2,
                 )
+
+        pygame.display.flip()
+
+    # Texto do Score (Canto Superior Esquerdo)
+        texto_score = self.fonte.render(f"SCORE: {self.pacman.pontos}", True, cfg.BRANCO)
+        self.tela.blit(texto_score, (10, 5))
+
+        # Texto das Vidas (Canto Superior Direito)
+        texto_vidas = self.fonte.render(f"VIDAS: {self.pacman.vidas}", True, cfg.BRANCO)
+        rect_vidas = texto_vidas.get_rect()
+        # Posiciona a direita, com margem de 10 pixels
+        rect_vidas.topright = (self.larguraTela - 10, 5)
+        self.tela.blit(texto_vidas, rect_vidas)
 
         pygame.display.flip()
 

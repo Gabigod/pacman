@@ -2,6 +2,7 @@ from config import TILE_SIZE, VELOCIDADE, PRETO
 from mapa import Mapa
 from collections import deque  # Necessario para o BFS
 import pygame
+import random
 
 
 # TAD para representar as entidades do jogo
@@ -54,7 +55,7 @@ class Entidade:
     def getSprite(self, sheet, x, y, w=16, h=16):
         if sheet is None:
             return None
-        sprite = pygame.Surface((w, h), pygame.SRCALPHA)
+        sprite = pygame.Surface((w, h))
         sprite.blit(sheet, (0, 0), (x, y, w, h))
         sprite.set_colorkey(PRETO)  # Define o preto como transparente
         return pygame.transform.scale(sprite, (TILE_SIZE, TILE_SIZE))
@@ -205,5 +206,10 @@ class Fantasma(Entidade):
                 dy = py - self.yGrid
                 self.direcao = (dx, dy)
             else:
-                self.direcao = (0, 0)  # Não encontrou caminho
+                vizinhos = mapa.vizinhos(self.xGrid, self.yGrid)
+                if vizinhos:
+                    px, py = random.choice(
+                        vizinhos
+                    )  # Se BFS retornou None, escolhe um vizinho aleatório para seguir
+                    self.direcao = (px - self.xGrid, py - self.yGrid)
         self.mover_fisica()

@@ -23,7 +23,9 @@ class Entidade:
 
         # Atributos visuais
         self.imagem = None
-        self.corFallback = (255, 0, 0)  # Cor vermelha como fallback
+
+        self.animacaoIndex = 0.0  # Índice para animação futura
+        self.animacaoSpeed = 0.15  # Velocidade da animação futura
 
     # Reorna a posição atual na grade baseada no centro do rect
     def getPosGrad(self) -> int:
@@ -65,15 +67,25 @@ class Entidade:
 class Pacman(Entidade):
     def __init__(self, x: int, y: int, sheet=None) -> None:
         super().__init__(x, y)
-        self.tempoInvencivel = 0  # 0 indica que está vulnerável
         self.vidas = 3
         self.pontos = 0
         self.proximaDirecao = (0, 0)  # Direção que o jogador quer ir
-        self.corFallback = (255, 255, 0)  # Cor amarela como fallback
+        self.tempoInvencivel = 0  # 0 indica que está vulnerável
 
-        # Carrega a sprite do Pacman
-        self.spriteOriginal = self.getSprite(sheet, 16, 0)
-        self.imagem = self.spriteOriginal  # TO-DO: Animação futura
+        # Carrega as sprites do Pacman
+        # Assume-se: (0,0) Fechado, (16,0) Aberto, (32,0) Muito Aberto
+        self.sprites = []
+        if sheet:
+            # Cria a sequência: Fechado -> Meio -> Aberto -> Meio
+            s0 = self.getSprite(sheet, 0, 0)  # Fechado
+            s1 = self.getSprite(sheet, 16, 0)  # Meio
+            s2 = self.getSprite(sheet, 32, 0)  # Aberto
+            self.sprites = [s0, s1, s2, s1]
+        else:
+            self.sprites = [None]
+
+        self.imagem = self.sprites[0]
+        self.animacaoSpeed = 0.3  # Pacman mastiga rápido
 
     # Chamado pelo evento de teclado para definir a direção desejada
     def processarEvento(self, key):
@@ -107,8 +119,19 @@ class Pacman(Entidade):
         # Move o Pacman fisicamente
         self.mover_fisica()
 
-        # Atualiza a rotação da sprite baseada na direção
-        if self.spriteOriginal:
+        # LÓGICA DA ANIMAÇÃO DO PACMAN
+        # Só anima se estiver se movendo
+        if self.direcao != (0, 0) and self.sprites:
+            self.animacaoIndex += self.animacaoSpeed
+            if self.animacaoIndex >= len(self.sprites):
+                self.animacaoIndex = 0.0
+
+        # Seleciona o frame base
+        idx = int(self.animacaoIndex)
+        spriteBase = self.sprites[idx] if idx < len(self.sprites) else self.sprites[0]
+
+        # Rotaciona a sprite conforme a direção
+        if spriteBase:
             angulo = 0
             if self.direcao == (-1, 0):
                 angulo = 180  # Esquerda
@@ -117,7 +140,7 @@ class Pacman(Entidade):
             elif self.direcao == (0, 1):
                 angulo = 270  # Baixo
             self.imagem = pygame.transform.rotate(
-                self.spriteOriginal, angulo
+                spriteBase, angulo
             )  # Gira a partir da original conforme o angulo
 
 
@@ -131,10 +154,35 @@ class Fantasma(Entidade):
         self.tempoAssustado = 0  # 0 indica que está normal
         self.speed = VELOCIDADE - 1  # Fantasmas são um pouco mais lentos que o Pacman
 
-        # Carrega as sprites específicas dos fantasmas
-        self.spriteNormal = self.getSprite(sheet, 0, 64)  # Vermelho
-        self.spriteAssustado = self.getSprite(sheet, 128, 64)  # Azul (assustado)
-        self.imagem = self.spriteNormal
+        # Carrega animações
+        self.framesNormal = []
+        self.framesAssustado = []
+
+        if sheet:
+            # Normal (Vermelho): (0, 64) e (16, 64)
+            self.framesNormal = [
+                self.getSprite(sheet, 0, 64),
+                self.getSprite(sheet, 16, 64),
+            ]
+            # Assustado (Azul): (128, 64) e (144, 64)
+            self.framesAssustado = [
+                self.getSprite(sheet, 128, 64),
+                self.getSprite(sheet, 144, 64),
+            ]
+            self.imagem = self.framesNormal[0]
+
+    # Metodo para atualizar a sprite baseada no estado
+    def atualizarSprite(self) -> None:
+        self.animacaoIndex += self.animacaoSpeed
+
+        if self.assustado:
+            conjunto = self.framesAssustado
+        else:
+            conjunto = self.framesNormal
+
+        if conjunto:
+            idx = int(self.animacaoIndex) % len(conjunto)
+            self.imagem = conjunto[idx]
 
     # Implementação do algoritmo BFS para encontrar o caminho até o pacman
     def bfsProx(self, mapa: Mapa, alvoX: int, alvoY: int) -> None:
@@ -185,6 +233,8 @@ class Fantasma(Entidade):
 
     # Atualização do movimento do fantasma
     def update(self, mapa: Mapa, pacman: Pacman) -> None:
+        # Atualiza a sprite antes de processar a lógica
+        self.atualizarSprite()
         # Verifica se está preso
         if self.tempoPreso > 0:
             self.tempoPreso -= 1

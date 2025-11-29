@@ -115,7 +115,7 @@ class EstadoJogo(Estado):
 
                         # Ativa powerup (no objeto jogo)
                         self.jogo.powerupAtivo = True
-                        self.jogo.powerupTimer = 8 * 60  # 8 segundos a 60 FPS
+                        self.jogo.powerupTimer = 15 * 60
 
                         # Deixa todos os fantasmas assustados
                         for f in self.jogo.fantasmas:

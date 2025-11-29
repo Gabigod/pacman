@@ -1,7 +1,216 @@
+from abc import ABC, abstractmethod
 import config as cfg
 from mapa import Mapa
 from entidades import Pacman, Fantasma
 import pygame
+
+
+# Classe Abstrata (Modelo)
+class Estado(ABC):
+    def __init__(self, jogo):
+        self.jogo = jogo
+
+    @abstractmethod
+    def processar_eventos(self, evento):
+        pass
+
+    @abstractmethod
+    def update(self):
+        pass
+
+    @abstractmethod
+    def desenhar(self):
+        pass
+
+
+# Estado do Menu
+class EstadoMenu(Estado):
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_1:
+                # Troca para o estado de jogo
+                self.jogo.mudarEstado(EstadoJogo(self.jogo))
+            elif evento.key == pygame.K_2:
+                print("Carregar Jogo - Não implementado")
+            elif evento.key == pygame.K_3:
+                print("Ver Ranking - Não implementado")
+            elif evento.key == pygame.K_4:
+                self.jogo.rodando = False
+
+    def update(self):
+        pass  # Menu estático
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        # Título
+        titulo = self.jogo.fonte.render("PACMAN", True, cfg.AMARELO)
+        rect_titulo = titulo.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 4)
+        )
+        self.jogo.tela.blit(titulo, rect_titulo)
+
+        # Opções
+        opcoes = ["1. Novo Jogo", "2. Carregar", "3. Ranking", "4. Sair"]
+        for i, texto in enumerate(opcoes):
+            txt = self.jogo.fonte.render(texto, True, cfg.BRANCO)
+            rect = txt.get_rect(
+                center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + i * 40)
+            )
+            self.jogo.tela.blit(txt, rect)
+
+        pygame.display.flip()
+
+
+# Estado de Gameplay
+class EstadoJogo(Estado):
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            self.jogo.pacman.processarEvento(evento.key)
+
+    def update(self):
+        # Acessa pacman e mapa através de self.jogo
+        self.jogo.pacman.update(self.jogo.mapa)
+
+        for fantasma in self.jogo.fantasmas:
+            fantasma.update(self.jogo.mapa, self.jogo.pacman)
+
+            # Colisão (usando colisão de retângulos do Pygame)
+            hitbox_pacman = self.jogo.pacman.rect.inflate(-10, -10)
+            hitbox_fantasma = fantasma.rect.inflate(-10, -10)
+
+            if hitbox_pacman.colliderect(hitbox_fantasma):
+                if fantasma.assustado:
+                    # Pacman come o fantasma
+                    self.jogo.pacman.pontos += 200
+                    fantasma.rect.x = fantasma.xInicio * cfg.TILE_SIZE
+                    fantasma.rect.y = fantasma.yInicio * cfg.TILE_SIZE
+                    fantasma.assustado = False
+                    fantasma.tempoPreso = 150  # Fica preso por 150 frames
+                else:
+                    if self.jogo.pacman.vidas > 0:
+                        self.jogo.pacman.vidas -= 1
+                        # Reseta posição usando coordenadas de grid * TILE_SIZE
+                        self.jogo.pacman.rect.x = (
+                            self.jogo.pacman.xInicio * cfg.TILE_SIZE
+                        )
+                        self.jogo.pacman.rect.y = (
+                            self.jogo.pacman.yInicio * cfg.TILE_SIZE
+                        )
+
+            # Lógica de comer pontos (baseada na grade)
+            if self.jogo.pacman.esta_centralizado():
+                px, py = self.jogo.pacman.getPosGrad()
+                # Verifica limites para evitar crash se sair do mapa
+                if 0 <= py < self.jogo.mapa.lin and 0 <= px < self.jogo.mapa.col:
+                    item = self.jogo.mapa.matriz[py][px]
+
+                    if item == ".":
+                        self.jogo.mapa.matriz[py][px] = " "
+                        self.jogo.pacman.pontos += 10
+
+                    elif item == "0":  # POWERUP
+                        self.jogo.mapa.matriz[py][px] = " "
+                        self.jogo.pacman.pontos += 50
+
+                        # Ativa powerup (no objeto jogo)
+                        self.jogo.powerupAtivo = True
+                        self.jogo.powerupTimer = 8 * 60  # 8 segundos a 60 FPS
+
+                        # Deixa todos os fantasmas assustados
+                        for f in self.jogo.fantasmas:
+                            f.assustado = True
+                            f.speed = 1  # mais lentos
+
+            # Timer do powerup
+            if self.jogo.powerupAtivo:
+                self.jogo.powerupTimer -= 1
+                if self.jogo.powerupTimer <= 0:
+                    self.jogo.powerupAtivo = False
+                    for f in self.jogo.fantasmas:
+                        f.assustado = False
+                        f.speed = cfg.VELOCIDADE - 1  # velocidade normal
+
+            self.desenhar()
+
+    def desenhar(self) -> None:
+        # Limpa a Tela usando self.jogo.tela
+        self.jogo.tela.fill(cfg.PRETO)
+
+        # Variável auxiliar para a altura da barra de score/vidas
+        offsetY = cfg.TILE_SIZE
+
+        # Desenha o mapa
+        for i in range(self.jogo.mapa.lin):
+            for j in range(self.jogo.mapa.col):
+                char = self.jogo.mapa.matriz[i][j]
+
+                x = j * cfg.TILE_SIZE
+                y = i * cfg.TILE_SIZE + offsetY
+
+                if char == "#":
+                    pygame.draw.rect(
+                        self.jogo.tela, cfg.AZUL, (x, y, cfg.TILE_SIZE, cfg.TILE_SIZE)
+                    )
+                elif char == ".":
+                    pygame.draw.circle(
+                        self.jogo.tela,
+                        cfg.BRANCO,
+                        (x + cfg.TILE_SIZE // 2, y + cfg.TILE_SIZE // 2),
+                        4,
+                    )
+                elif char == "0":
+                    pygame.draw.circle(
+                        self.jogo.tela,
+                        cfg.BRANCO,
+                        (x + cfg.TILE_SIZE // 2, y + cfg.TILE_SIZE // 2),
+                        8,
+                    )
+
+        # Desenha o Pacman
+        rectDesenhoPacman = self.jogo.pacman.rect.move(0, offsetY)
+
+        if self.jogo.pacman.imagem:
+            self.jogo.tela.blit(self.jogo.pacman.imagem, rectDesenhoPacman)
+        else:
+            pygame.draw.circle(
+                self.jogo.tela,
+                cfg.AMARELO,
+                self.jogo.pacman.rect.center,
+                cfg.TILE_SIZE // 2,
+            )
+
+        # Desenha todos os fantasmas
+        for fantasma in self.jogo.fantasmas:
+            rectDesenhoFantasma = fantasma.rect.move(0, offsetY)
+
+            if fantasma.imagem:
+                self.jogo.tela.blit(fantasma.imagem, rectDesenhoFantasma)
+            else:
+                corFantasma = cfg.AZUL if fantasma.assustado else cfg.VERMELHO
+                pygame.draw.circle(
+                    self.jogo.tela,
+                    corFantasma,
+                    fantasma.rect.center,
+                    cfg.TILE_SIZE // 2,
+                )
+
+        # Texto do Score
+        textoScore = self.jogo.fonte.render(
+            f"SCORE: {self.jogo.pacman.pontos}", True, cfg.BRANCO
+        )
+        yText = (cfg.TILE_SIZE - textoScore.get_height()) // 2
+        self.jogo.tela.blit(textoScore, (10, yText))
+
+        # Texto das Vidas
+        textoVidas = self.jogo.fonte.render(
+            f"VIDAS: {self.jogo.pacman.vidas}", True, cfg.BRANCO
+        )
+        rectVidas = textoVidas.get_rect()
+        rectVidas.topright = (self.jogo.larguraTela - 10, yText)
+        self.jogo.tela.blit(textoVidas, rectVidas)
+
+        pygame.display.flip()
 
 
 class Jogo:
@@ -20,7 +229,12 @@ class Jogo:
         pygame.display.set_caption("Pacman")
         self.clock = pygame.time.Clock()
 
-        # fonte para a HUD. None usa a padrão, tamanho 28.
+        # Inicializa variáveis de jogo
+        self.powerupAtivo = False
+        self.powerupTimer = 0
+        self.rodando = True  # Controle do loop principal
+
+        # fonte para a HUD.
         self.fonte = pygame.font.Font(None, 28)
 
         # Tenta carregar os sprites
@@ -31,167 +245,51 @@ class Jogo:
             print(f"Erro ao carregar sprites: {e}")
             self.folhaSprites = None
 
-        # Instancia o objeto pacman com as coordenadas lidas durante o carregamento do mapa
-        px, py = self.mapa.posicaoInicialPacman
-        self.pacman = Pacman(px, py, self.folhaSprites)
+        # Instancia o objeto pacman
+        if self.mapa.posicaoInicialPacman:
+            px, py = self.mapa.posicaoInicialPacman
+            self.pacman = Pacman(px, py, self.folhaSprites)
+        else:
+            print("ERRO: Posição inicial do Pacman não encontrada no mapa!")
+            # Posição padrão segura ou sair
+            self.pacman = Pacman(1, 1, self.folhaSprites)
 
-        # Instancia os fantasmas nas posições iniciais lidas durante o carregamento do mapa
+        # Instancia os fantasmas
         self.fantasmas = []
-        self.powerupAtivo = False
-        self.powerupTimer = 0
-
         for fx, fy in self.mapa.posicaoInicialFantasmas:
             fantasma = Fantasma(fx, fy, self.folhaSprites)
             self.fantasmas.append(fantasma)
 
-    # Método para desenhar o estado atual do jogo
+        # Define o estado inicial
+        self.estadoAtual = EstadoMenu(self)
+
+    def mudarEstado(self, novo_estado: Estado) -> None:
+        self.estadoAtual = novo_estado
+
     def desenhar(self) -> None:
-        # Limpa a Tela
-        self.tela.fill(cfg.PRETO)
+        self.estadoAtual.desenhar()
 
-        # Variável auxiliar para a altura da barra de score/vidas
-        offsetY = cfg.TILE_SIZE
-
-        # Desenha o mapa
-        for i in range(self.mapa.lin):
-            for j in range(self.mapa.col):
-                char = self.mapa.matriz[i][j]
-
-                x = j * cfg.TILE_SIZE
-                y = i * cfg.TILE_SIZE + offsetY  # Aplica o offset Y
-
-                if char == "#":
-                    pygame.draw.rect(
-                        self.tela, cfg.AZUL, (x, y, cfg.TILE_SIZE, cfg.TILE_SIZE)
-                    )
-                elif char == ".":
-                    pygame.draw.circle(
-                        self.tela,
-                        cfg.BRANCO,
-                        (x + cfg.TILE_SIZE // 2, y + cfg.TILE_SIZE // 2),
-                        4,
-                    )
-                elif char == "0":
-                    pygame.draw.circle(
-                        self.tela,
-                        cfg.BRANCO,
-                        (x + cfg.TILE_SIZE // 2, y + cfg.TILE_SIZE // 2),
-                        8,
-                    )
-
-        # Desenha o Pacman
-        rectDesenhoPacman = self.pacman.rect.move(0, offsetY)
-
-        if self.pacman.imagem:  # Se carregou a imagem do Pacman
-            self.tela.blit(
-                self.pacman.imagem, rectDesenhoPacman
-            )  # Desenha com a imagem
-        else:
-            pygame.draw.circle(
-                self.tela,
-                cfg.AMARELO,
-                self.pacman.rect.center,
-                cfg.TILE_SIZE // 2,  # Se não, desenha um círculo amarelo
-            )
-
-        # Desenha todos os fantasmas
-        for fantasma in self.fantasmas:
-            rectDesenhoFantasma = fantasma.rect.move(0, offsetY)
-
-            if fantasma.imagem:
-                self.tela.blit(fantasma.imagem, rectDesenhoFantasma)
-            else:
-                corFantasma = cfg.AZUL if fantasma.assustado else cfg.VERMELHO
-                pygame.draw.circle(
-                    self.tela,
-                    corFantasma,
-                    fantasma.rect.center,
-                    cfg.TILE_SIZE // 2,
-                )
-
-        # Texto do Score (Canto Superior Esquerdo)
-        textoScore = self.fonte.render(f"SCORE: {self.pacman.pontos}", True, cfg.BRANCO)
-        yText = (cfg.TILE_SIZE - textoScore.get_height()) // 2
-        self.tela.blit(textoScore, (10, yText))
-
-        # Texto das Vidas (Canto Superior Direito)
-        textoVidas = self.fonte.render(f"VIDAS: {self.pacman.vidas}", True, cfg.BRANCO)
-        rectVidas = textoVidas.get_rect()
-        # Posiciona a direita, com margem de 10 pixels
-        rectVidas.topright = (self.larguraTela - 10, yText)
-        self.tela.blit(textoVidas, rectVidas)
-
-        pygame.display.flip()
-
-    # Método principal para executar o jogo
     def executar(self) -> None:
-        rodando = True
-        while rodando:
+        while self.rodando:
+            self.clock.tick(60)
+
+            # Processa os eventos
             for evento in pygame.event.get():
                 if evento.type == pygame.QUIT:
-                    rodando = False
-                    pygame.quit()
-                    return
-                # Input do Pacman
-                if evento.type == pygame.KEYDOWN:
-                    self.pacman.processarEvento(evento.key)
+                    self.rodando = False
+                else:
+                    self.estadoAtual.processar_eventos(evento)
 
-            # Lógica de atualização do jogo
-            self.pacman.update(self.mapa)
+            # Update do estado atual
+            self.estadoAtual.update()
 
-            for fantasma in self.fantasmas:
-                fantasma.update(self.mapa, self.pacman)
-
-                # Colisão (usando colisão de retângulos do Pygame)
-                # Reduzimos um pouco o rect para a colisão não ser injusta nas bordas
-                hitbox_pacman = self.pacman.rect.inflate(-10, -10)
-                hitbox_fantasma = fantasma.rect.inflate(-10, -10)
-
-                if hitbox_pacman.colliderect(hitbox_fantasma):
-                    if fantasma.assustado:
-                        # Pacman come o fantasma
-                        self.pacman.pontos += 200
-                        fantasma.rect.x = fantasma.xInicio * cfg.TILE_SIZE
-                        fantasma.rect.y = fantasma.yInicio * cfg.TILE_SIZE
-                        fantasma.assustado = False
-                        fantasma.tempoPreso = 150  # Fica preso por 150 frames
-                    else:
-                        print("Game Over!")
-                        rodando = False
-
-            # Lógica de comer pontos (baseada na grade)
-            if self.pacman.esta_centralizado():
-                px, py = self.pacman.getPosGrad()
-                item = self.mapa.matriz[py][px]
-
-                if item == ".":
-                    self.mapa.matriz[py][px] = " "
-                    self.pacman.pontos += 10
-
-                elif item == "0":  # POWERUP
-                    self.mapa.matriz[py][px] = " "
-                    self.pacman.pontos += 50
-
-                    # Ativa powerup
-                    self.powerupAtivo = True
-                    self.powerupTimer = 8 * 60  # 8 segundos a 60 FPS
-
-                    # Deixa todos os fantasmas assustados
-                    for f in self.fantasmas:
-                        f.assustado = True
-                        f.speed = 1  # mais lentos
-
-            # Timer do powerup
-            if self.powerupAtivo:
-                self.powerupTimer -= 1
-                if self.powerupTimer <= 0:
-                    self.powerupAtivo = False
-                    for f in self.fantasmas:
-                        f.assustado = False
-                        f.speed = cfg.VELOCIDADE - 1  # velocidade normal
-
-            self.desenhar()
-            self.clock.tick(60)
+            # Nota: O desenho já é chamado dentro de update() do EstadoJogo,
+            # mas para o Menu pode ser necessário chamar aqui se o update for vazio.
+            # Para garantir consistência, o ideal é chamar desenhar() aqui se o estado não o fizer.
+            # No código original, EstadoJogo chama desenhar() no final do update,
+            # mas EstadoMenu não chama.
+            if isinstance(self.estadoAtual, EstadoMenu):
+                self.estadoAtual.desenhar()
 
         pygame.quit()
 

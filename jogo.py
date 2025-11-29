@@ -13,12 +13,14 @@ class Jogo:
 
         # Configuração da tela
         self.larguraTela = self.mapa.col * cfg.TILE_SIZE
-        self.alturaTela = self.mapa.lin * cfg.TILE_SIZE
+        self.alturaTela = (
+            self.mapa.lin + 1
+        ) * cfg.TILE_SIZE  # O +1 é para a barra de score/vidas
         self.tela = pygame.display.set_mode((self.larguraTela, self.alturaTela))
         pygame.display.set_caption("Pacman")
         self.clock = pygame.time.Clock()
 
-        # Cria uma fonte do sistema. None usa a padrão, tamanho 28.
+        # fonte para a HUD. None usa a padrão, tamanho 28.
         self.fonte = pygame.font.Font(None, 28)
 
         # Tenta carregar os sprites
@@ -44,7 +46,11 @@ class Jogo:
 
     # Método para desenhar o estado atual do jogo
     def desenhar(self) -> None:
+        # Limpa a Tela
         self.tela.fill(cfg.PRETO)
+
+        # Variável auxiliar para a altura da barra de score/vidas
+        offsetY = cfg.TILE_SIZE
 
         # Desenha o mapa
         for i in range(self.mapa.lin):
@@ -52,7 +58,7 @@ class Jogo:
                 char = self.mapa.matriz[i][j]
 
                 x = j * cfg.TILE_SIZE
-                y = i * cfg.TILE_SIZE
+                y = i * cfg.TILE_SIZE + offsetY  # Aplica o offset Y
 
                 if char == "#":
                     pygame.draw.rect(
@@ -74,8 +80,12 @@ class Jogo:
                     )
 
         # Desenha o Pacman
+        rectDesenhoPacman = self.pacman.rect.move(0, offsetY)
+
         if self.pacman.imagem:  # Se carregou a imagem do Pacman
-            self.tela.blit(self.pacman.imagem, self.pacman.rect)  # Desenha com a imagem
+            self.tela.blit(
+                self.pacman.imagem, rectDesenhoPacman
+            )  # Desenha com a imagem
         else:
             pygame.draw.circle(
                 self.tela,
@@ -86,8 +96,10 @@ class Jogo:
 
         # Desenha todos os fantasmas
         for fantasma in self.fantasmas:
+            rectDesenhoFantasma = fantasma.rect.move(0, offsetY)
+
             if fantasma.imagem:
-                self.tela.blit(fantasma.imagem, fantasma.rect)
+                self.tela.blit(fantasma.imagem, rectDesenhoFantasma)
             else:
                 corFantasma = cfg.AZUL if fantasma.assustado else cfg.VERMELHO
                 pygame.draw.circle(
@@ -97,18 +109,17 @@ class Jogo:
                     cfg.TILE_SIZE // 2,
                 )
 
-        pygame.display.flip()
-
-    # Texto do Score (Canto Superior Esquerdo)
-        texto_score = self.fonte.render(f"SCORE: {self.pacman.pontos}", True, cfg.BRANCO)
-        self.tela.blit(texto_score, (10, 5))
+        # Texto do Score (Canto Superior Esquerdo)
+        textoScore = self.fonte.render(f"SCORE: {self.pacman.pontos}", True, cfg.BRANCO)
+        yText = (cfg.TILE_SIZE - textoScore.get_height()) // 2
+        self.tela.blit(textoScore, (10, yText))
 
         # Texto das Vidas (Canto Superior Direito)
-        texto_vidas = self.fonte.render(f"VIDAS: {self.pacman.vidas}", True, cfg.BRANCO)
-        rect_vidas = texto_vidas.get_rect()
+        textoVidas = self.fonte.render(f"VIDAS: {self.pacman.vidas}", True, cfg.BRANCO)
+        rectVidas = textoVidas.get_rect()
         # Posiciona a direita, com margem de 10 pixels
-        rect_vidas.topright = (self.larguraTela - 10, 5)
-        self.tela.blit(texto_vidas, rect_vidas)
+        rectVidas.topright = (self.larguraTela - 10, yText)
+        self.tela.blit(textoVidas, rectVidas)
 
         pygame.display.flip()
 

@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 import config as cfg
 from mapa import Mapa
 from entidades import Pacman, Fantasma
-import pygame
-import os
+import pygame  # Para a GUI
+import pickle  # Para salvar
+import os  # Para funcionalidades do sistema, como listar diretórios
 
 
 # Classe Abstrata (Modelo)
@@ -22,6 +23,150 @@ class Estado(ABC):
     @abstractmethod
     def desenhar(self):
         pass
+
+
+class EstadoPause(Estado):
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_p or evento.key == pygame.K_ESCAPE:
+                # Volta para o jogo (despausa)
+                self.jogo.mudarEstado(self.jogo.estadoAnterior)
+
+            elif evento.key == pygame.K_s:
+                # Vai para tela de salvar
+                self.jogo.mudarEstado(EstadoSalvar(self.jogo))
+
+            elif evento.key == pygame.K_q:
+                # Sai para o menu principal
+                self.jogo.mudarEstado(EstadoMenu(self.jogo))
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        # (opcional, se quiser fundo transparente)
+        self.jogo.estadoAnterior.desenhar()
+
+        # Sobreposição simples preta
+        self.jogo.tela.fill(cfg.PRETO)
+
+        titulo = self.jogo.fonte.render("JOGO PAUSADO", True, cfg.AMARELO)
+        rect = titulo.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 3)
+        )
+        self.jogo.tela.blit(titulo, rect)
+
+        opcoes = ["(P) Continuar", "(S) Salvar Jogo", "(Q) Sair para Menu"]
+
+        y = self.jogo.alturaTela // 2
+        for op in opcoes:
+            txt = self.jogo.fonte.render(op, True, cfg.BRANCO)
+            rectOp = txt.get_rect(center=(self.jogo.larguraTela // 2, y))
+            self.jogo.tela.blit(txt, rectOp)
+            y += 40
+
+        pygame.display.flip()
+
+
+class EstadoSalvar(Estado):
+    def __init__(self, jogo):
+        super().__init__(jogo)
+        self.nomeArquivo = "save1"  # Nome padrão
+
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_RETURN:
+                if self.nomeArquivo:
+                    self.jogo.salvarJogo(self.nomeArquivo)
+                    # Volta para o pause após salvar
+                    self.jogo.mudarEstado(EstadoPause(self.jogo))
+
+            elif evento.key == pygame.K_ESCAPE:
+                self.jogo.mudarEstado(EstadoPause(self.jogo))
+
+            elif evento.key == pygame.K_BACKSPACE:
+                self.nomeArquivo = self.nomeArquivo[:-1]
+            else:
+                if len(self.nomeArquivo) < 15:  # Limite de caracteres
+                    self.nomeArquivo += evento.unicode
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        titulo = self.jogo.fonte.render("NOME DO SAVE:", True, cfg.AMARELO)
+        self.jogo.tela.blit(titulo, (50, 100))
+
+        entrada = self.jogo.fonte.render(self.nomeArquivo, True, cfg.BRANCO)
+        self.jogo.tela.blit(entrada, (50, 150))
+
+        info = self.jogo.fonte.render(
+            "ENTER para Salvar / ESC para Cancelar", True, cfg.AZUL
+        )
+        self.jogo.tela.blit(info, (50, 250))
+
+        pygame.display.flip()
+
+
+class EstadoSeletorLoad(Estado):
+    def __init__(self, jogo):
+        super().__init__(jogo)
+        self.diretorio = "saves"
+        if not os.path.exists(self.diretorio):
+            os.makedirs(self.diretorio)
+
+        try:
+            self.arquivos = [
+                f for f in os.listdir(self.diretorio) if f.endswith(".pkl")
+            ]
+            self.arquivos.sort()
+        except Exception:
+            self.arquivos = []
+
+        self.indexSelecionado = 0
+
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_ESCAPE:
+                self.jogo.mudarEstado(EstadoMenu(self.jogo))
+            elif evento.key == pygame.K_UP:
+                self.indexSelecionado = (self.indexSelecionado - 1) % len(self.arquivos)
+            elif evento.key == pygame.K_DOWN:
+                self.indexSelecionado = (self.indexSelecionado + 1) % len(self.arquivos)
+            elif evento.key == pygame.K_RETURN:
+                if self.arquivos:
+                    arquivo = self.arquivos[self.indexSelecionado]
+                    if self.jogo.carregarJogo(arquivo):
+                        # Se carregar com sucesso, o metodo carregarJogo já define o estado
+                        pass
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        titulo = self.jogo.fonte.render("CARREGAR JOGO", True, cfg.AMARELO)
+        rectT = titulo.get_rect(center=(self.jogo.larguraTela // 2, 50))
+        self.jogo.tela.blit(titulo, rectT)
+
+        if not self.arquivos:
+            msg = self.jogo.fonte.render("Nenhum save encontrado.", True, cfg.VERMELHO)
+            self.jogo.tela.blit(msg, (50, 100))
+            return
+
+        y = 100
+        for i, arq in enumerate(self.arquivos):
+            cor = cfg.AMARELO if i == self.indexSelecionado else cfg.BRANCO
+            txt = f"> {arq}" if i == self.indexSelecionado else arq
+            render = self.jogo.fonte.render(txt, True, cor)
+            rect = render.get_rect(center=(self.jogo.larguraTela // 2, y))
+            self.jogo.tela.blit(render, rect)
+            y += 40
+
+        pygame.display.flip()
 
 
 class EstadoNome(Estado):
@@ -140,7 +285,7 @@ class EstadoMenu(Estado):
                 # Troca para o estado de jogo
                 self.jogo.mudarEstado(EstadoSeletorFase(self.jogo))
             elif evento.key == pygame.K_2:
-                print("Carregar Jogo - Não implementado")
+                self.jogo.mudarEstado(EstadoSeletorLoad(self.jogo))
             elif evento.key == pygame.K_3:
                 self.jogo.mudarEstado(EstadoRanking(self.jogo))
             elif evento.key == pygame.K_4:
@@ -286,7 +431,12 @@ class EstadoJogo(Estado):
 
     def processar_eventos(self, evento):
         if evento.type == pygame.KEYDOWN:
-            self.jogo.pacman.processarEvento(evento.key)
+            if evento.key == pygame.K_p:
+                # Salva a referência deste estado para voltar depois
+                self.jogo.estadoAnterior = self
+                self.jogo.mudarEstado(EstadoPause(self.jogo))
+            else:
+                self.jogo.pacman.processarEvento(evento.key)
 
     def update(self):
         # Acessa pacman e mapa através de self.jogo
@@ -492,20 +642,110 @@ class Jogo:
         # Define o estado inicial
         self.estadoAtual = EstadoMenu(self)
 
-        # # Instancia o objeto pacman
-        # if self.mapa.posicaoInicialPacman:
-        #     px, py = self.mapa.posicaoInicialPacman
-        #     self.pacman = Pacman(px, py, self.folhaSprites)
-        # else:
-        #     print("ERRO: Posição inicial do Pacman não encontrada no mapa!")
-        #     # Posição padrão segura ou sair
-        #     self.pacman = Pacman(1, 1, self.folhaSprites)
-        #
-        # # Instancia os fantasmas
-        # self.fantasmas = []
-        # for fx, fy in self.mapa.posicaoInicialFantasmas:
-        #     fantasma = Fantasma(fx, fy, self.folhaSprites)
-        #     self.fantasmas.append(fantasma)
+    # Método para salvar o estado atual do jogo
+    def salvarJogo(self, nomeArquivo):
+        caminhoDir = "saves"
+        if not os.path.exists(caminhoDir):
+            os.makedirs(caminhoDir)
+
+        # Garante extensão .pkl
+        if not nomeArquivo.endswith(".pkl"):
+            nomeArquivo += ".pkl"
+
+        caminhoCompleto = os.path.join(caminhoDir, nomeArquivo)
+
+        # 1. Preparar objetos (remover imagens que não podem ser salvas)
+        self.pacman.limparImagens()
+        for f in self.fantasmas:
+            f.limparImagens()
+
+        # 2. Coletar dados do estado atual
+        dados = {
+            "mapa": self.mapa,
+            "pacman": self.pacman,
+            "fantasmas": self.fantasmas,
+            "score": self.pacman.pontos,
+            "vidas": self.pacman.vidas,
+            "nomeMapaAtual": self.nomeMapaAtual,
+            "powerupAtivo": self.powerupAtivo,
+            "powerupTimer": self.powerupTimer,
+        }
+
+        try:
+            with open(caminhoCompleto, "wb") as f:
+                pickle.dump(dados, f)
+            print(f"Jogo salvo em {caminhoCompleto}")
+        except Exception as e:
+            print(f"Erro ao salvar: {e}")
+
+        # Restaura imagens imediatamente para o jogo não quebrar se continuar
+        self.pacman.restaurarImagens(self.folhaSprites)
+        for f in self.fantasmas:
+            f.restaurarImagens(self.folhaSprites)
+
+    # Método para carregar
+    def carregarJogo(self, nomeArquivo):
+        caminho = os.path.join("saves", nomeArquivo)
+        if not os.path.exists(caminho):
+            print("Arquivo não encontrado.")
+            return False
+
+        try:
+            with open(caminho, "rb") as f:
+                dados = pickle.load(f)
+
+            # Restaura variáveis globais
+            self.mapa = dados["mapa"]
+            self.nomeMapaAtual = dados["nomeMapaAtual"]
+            self.powerupAtivo = dados.get("powerupAtivo", False)
+            self.powerupTimer = dados.get("powerupTimer", 0)
+
+            # Restaura entidades
+            self.pacman = dados["pacman"]
+            self.fantasmas = dados["fantasmas"]
+
+            # IMPORTANTE: Recarregar as sprites (imagens)
+            self.pacman.restaurarImagens(self.folhaSprites)
+            for f in self.fantasmas:
+                f.restaurarImagens(self.folhaSprites)
+
+            # Atualiza dimensões da tela caso o save seja de um mapa diferente
+            self.larguraTela = self.mapa.col * cfg.TILE_SIZE
+            self.alturaTela = (self.mapa.lin + 1) * cfg.TILE_SIZE
+            self.tela = pygame.display.set_mode((self.larguraTela, self.alturaTela))
+
+            # Cria o Estado de Jogo JÁ restaurado
+            # Precisamos instanciar o EstadoJogo, mas SEM chamar carregarNivel,
+            # pois já carregamos os objetos manualmente.
+
+            estadoJ = EstadoJogo(self, self.nomeMapaAtual)
+            # O construtor do EstadoJogo chama carregarNivel, o que RESETARIA o jogo.
+            # Precisamos evitar isso ou ajustar o EstadoJogo.
+            # Vamos modificar levemente a criação do estado ou apenas setar o estado
+            # e forçar os objetos que acabamos de carregar.
+
+            # Como o EstadoJogo chama self.jogo.carregarNivel no __init__,
+            # ele vai sobrescrever o que acabamos de carregar.
+            # Vamos corrigir recarregando os objetos DO SAVE logo após instanciar o estado.
+
+            self.pacman = dados[
+                "pacman"
+            ]  # Reatribui para garantir (o carregarNivel resetou)
+            self.pacman.restaurarImagens(self.folhaSprites)
+            self.fantasmas = dados["fantasmas"]
+            for f in self.fantasmas:
+                f.restaurarImagens(self.folhaSprites)
+            self.mapa = dados["mapa"]  # O mapa do save pode ter pontinhos comidos
+
+            # Define o estado "Paused"
+            self.estadoAnterior = estadoJ
+            self.mudarEstado(EstadoPause(self))
+
+            return True
+
+        except Exception as e:
+            print(f"Erro ao carregar save: {e}")
+            return False
 
     # Lógica para carregar o mapa
     def carregarNivel(self, nomeArquivo):
@@ -588,7 +828,6 @@ class Jogo:
             # No código original, EstadoJogo chama desenhar() no final do update,
             # mas EstadoMenu não chama.
             self.estadoAtual.desenhar()
-
         pygame.quit()
 
 

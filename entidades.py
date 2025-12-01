@@ -69,9 +69,12 @@ class Pacman(Entidade):
         super().__init__(x, y)
         self.vidas = 3
         self.pontos = 0
+        self.invencivel = False
+        self.visivel = True
+        self.timerPiscar = 0
         self.proximaDirecao = (0, 0)  # Direção que o jogador quer ir
-        self.tempoInvencivel = 0  # 0 indica que está vulnerável
-
+        self.invencivelTimer = 0  # 0 indica que está vulnerável
+        self.parpadeoToggle = False
         # Carrega as sprites do Pacman
         # Assume-se: (0,0) Fechado, (16,0) Aberto, (32,0) Muito Aberto
         self.sprites = []
@@ -100,6 +103,19 @@ class Pacman(Entidade):
 
     # Lógica principal de movimento do Pacman (chamada a cada frame)
     def update(self, mapa: Mapa) -> None:
+        # --- SISTEMA DE INVENCIBILIDADE ---
+        if self.invencivel:
+            self.invencivelTimer -= 1
+
+            # alterna invisível / visível a cada 10 frames
+            if self.invencivelTimer % 10 == 0:
+                self.parpadeoToggle = not self.parpadeoToggle
+
+            # acabou a invencibilidade
+            if self.invencivelTimer <= 0:
+                self.invencivel = False
+                self.parpadeoToggle = False
+
         # Verifica se está centralizado para mudar de direção
         if self.esta_centralizado():
             xGrid, yGrid = self.getPosGrad()
@@ -142,6 +158,31 @@ class Pacman(Entidade):
             self.imagem = pygame.transform.rotate(
                 spriteBase, angulo
             )  # Gira a partir da original conforme o angulo
+    def desenhar(self, tela):
+        # Se estiver invencível e for um frame "invisível", NÃO desenha
+        if self.invencivel and self.parpadeoToggle:
+            return
+
+        # Caso contrário, desenha normalmente
+        tela.blit(self.imagem, self.rect)
+    def morrer(self):
+        # perde 1 vida
+        self.vidas -= 1
+
+        # se acabou vidas → retorna True (game over)
+        if self.vidas <= 0:
+            return True
+
+        # caso contrário, reinicia pacman e liga invencibilidade
+        self.rect.x = self.xInicio * TILE_SIZE
+        self.rect.y = self.yInicio * TILE_SIZE
+        self.direcao = (0, 0)
+        self.invencivel = True
+        self.invencivelTimer = 120  # 2 segundos invencível
+        self.parpadeoToggle = False
+
+        return False
+   
 
 
 # Subclasse específica para os Fantasmas

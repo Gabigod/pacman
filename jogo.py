@@ -22,6 +22,45 @@ class Estado(ABC):
     def desenhar(self):
         pass
 
+class EstadoNome(Estado):
+    def __init__(self, jogo, score):
+        super().__init__(jogo)
+        self.score = score
+        self.nome = ""
+
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_RETURN and len(self.nome) > 0:
+                self.jogo.salvar_score(self.nome, self.score)
+                self.jogo.mudarEstado(EstadoGameOver(self.jogo))
+            
+            elif evento.key == pygame.K_BACKSPACE:
+                self.nome = self.nome[:-1]
+
+            else:
+                if len(self.nome) < 10:
+                    self.nome += evento.unicode
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        titulo = self.jogo.fonte.render("DIGITE SEU NOME:", True, cfg.AMARELO)
+        rect = titulo.get_rect(center=(self.jogo.larguraTela//2, 200))
+        self.jogo.tela.blit(titulo, rect)
+
+        nome_txt = self.jogo.fonte.render(self.nome, True, cfg.BRANCO)
+        rect2 = nome_txt.get_rect(center=(self.jogo.larguraTela//2, 260))
+        self.jogo.tela.blit(nome_txt, rect2)
+
+        msg = self.jogo.fonte.render("Pressione ENTER para confirmar", True, cfg.VERMELHO)
+        rect3 = msg.get_rect(center=(self.jogo.larguraTela//2, 320))
+        self.jogo.tela.blit(msg, rect3)
+
+        pygame.display.flip()
+
 
 # Estado do Menu
 class EstadoMenu(Estado):
@@ -33,7 +72,7 @@ class EstadoMenu(Estado):
             elif evento.key == pygame.K_2:
                 print("Carregar Jogo - Não implementado")
             elif evento.key == pygame.K_3:
-                print("Ver Ranking - Não implementado")
+                self.jogo.mudarEstado(EstadoRanking(self.jogo))
             elif evento.key == pygame.K_4:
                 self.jogo.rodando = False
 
@@ -61,6 +100,98 @@ class EstadoMenu(Estado):
 
         pygame.display.flip()
 
+class EstadoRanking(Estado):
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_ESCAPE:
+                self.jogo.mudarEstado(EstadoMenu(self.jogo))
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        titulo = self.jogo.fonte.render("RANKING", True, cfg.AMARELO)
+        rect = titulo.get_rect(center=(self.jogo.larguraTela//2, 60))
+        self.jogo.tela.blit(titulo, rect)
+
+        # exibir lista de scores
+        y = 120
+        for i, (nome, pontos) in enumerate(self.jogo.scores):
+            texto = self.jogo.fonte.render(f"{i+1}. {nome} — {pontos} pontos", True, cfg.BRANCO)
+            rect = texto.get_rect(center=(self.jogo.larguraTela//2, y))
+            self.jogo.tela.blit(texto, rect)
+            y += 40
+
+        # instrução
+        msg = self.jogo.fonte.render("Pressione ESC para voltar", True, cfg.VERMELHO)
+        rect = msg.get_rect(center=(self.jogo.larguraTela//2, self.jogo.alturaTela - 60))
+        self.jogo.tela.blit(msg, rect)
+
+        pygame.display.flip()
+
+
+
+class EstadoGameOver(Estado):
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_RETURN:
+                self.jogo.rodando = False
+
+            elif evento.key == pygame.K_1:
+                self.reiniciar_jogo()
+
+            elif evento.key == pygame.K_2:
+                self.jogo.mudarEstado(EstadoRanking(self.jogo))
+
+
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        txt = self.jogo.fonte.render("GAME OVER", True, cfg.VERMELHO)
+        rect = txt.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 - 40))
+        self.jogo.tela.blit(txt, rect)
+
+        txt2 = self.jogo.fonte.render("Pressione ENTER para sair", True, cfg.BRANCO)
+        rect2 = txt2.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2))
+        self.jogo.tela.blit(txt2, rect2)
+
+        txt3 = self.jogo.fonte.render("Pressione 1 para reiniciar", True, cfg.BRANCO)
+        rect3 = txt3.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 40))
+        self.jogo.tela.blit(txt3, rect3)
+
+        txt4 = self.jogo.fonte.render("Pressione 2 para ver o Ranking", True, cfg.BRANCO)
+        rect4 = txt4.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 80))
+        self.jogo.tela.blit(txt4, rect4)
+
+        pygame.display.flip()
+
+    def reiniciar_jogo(self):
+        # Recarrega o mapa
+        self.jogo.mapa = Mapa("fases/fase1.txt")
+
+        # Reset do Pacman
+        px, py = self.jogo.mapa.posicaoInicialPacman
+        self.jogo.pacman = Pacman(px, py, self.jogo.folhaSprites)
+
+        # Reset dos fantasmas
+        self.jogo.fantasmas = []
+        for fx, fy in self.jogo.mapa.posicaoInicialFantasmas:
+            self.jogo.fantasmas.append(Fantasma(fx, fy, self.jogo.folhaSprites))
+
+        # Reset powerups e status
+        self.jogo.powerupAtivo = False
+        self.jogo.powerupTimer = 0
+
+        # VOLTA ao estado de jogo
+        self.jogo.mudarEstado(EstadoJogo(self.jogo))
+
+        
 
 # Estado de Gameplay
 class EstadoJogo(Estado):
@@ -80,23 +211,39 @@ class EstadoJogo(Estado):
             hitbox_fantasma = fantasma.rect.inflate(-10, -10)
 
             if hitbox_pacman.colliderect(hitbox_fantasma):
+
+                # Se o PACMAN estiver invencível, ignorar colisões
+                if self.jogo.pacman.invencivel:
+                    continue
+
                 if fantasma.assustado:
                     # Pacman come o fantasma
                     self.jogo.pacman.pontos += 200
                     fantasma.rect.x = fantasma.xInicio * cfg.TILE_SIZE
                     fantasma.rect.y = fantasma.yInicio * cfg.TILE_SIZE
                     fantasma.assustado = False
-                    fantasma.tempoPreso = 150  # Fica preso por 150 frames
+                    fantasma.tempoPreso = 150
+
                 else:
-                    if self.jogo.pacman.vidas > 0:
-                        self.jogo.pacman.vidas -= 1
-                        # Reseta posição usando coordenadas de grid * TILE_SIZE
-                        self.jogo.pacman.rect.x = (
-                            self.jogo.pacman.xInicio * cfg.TILE_SIZE
-                        )
-                        self.jogo.pacman.rect.y = (
-                            self.jogo.pacman.yInicio * cfg.TILE_SIZE
-                        )
+                    # Perde vida
+                    self.jogo.pacman.vidas -= 1
+
+                    # Se acabou as vidas → GAME OVER
+                    if self.jogo.pacman.vidas <= 0:
+                        self.jogo.mudarEstado(EstadoNome(self.jogo, self.jogo.pacman.pontos))
+                        return
+
+                    # SENÃO → reset posição
+                    self.jogo.pacman.rect.x = self.jogo.pacman.xInicio * cfg.TILE_SIZE
+                    self.jogo.pacman.rect.y = self.jogo.pacman.yInicio * cfg.TILE_SIZE
+
+                    self.jogo.pacman.direcao = (0, 0)
+                    self.jogo.pacman.proximaDirecao = (0, 0)
+
+                    # Ativa invencibilidade temporária
+                    self.jogo.pacman.invencivel = True
+                    self.jogo.pacman.invencivelTimer = 120  # 2 segundos (60 fps)
+
 
             # Lógica de comer pontos (baseada na grade)
             if self.jogo.pacman.esta_centralizado():
@@ -170,15 +317,21 @@ class EstadoJogo(Estado):
         # Desenha o Pacman
         rectDesenhoPacman = self.jogo.pacman.rect.move(0, offsetY)
 
-        if self.jogo.pacman.imagem:
-            self.jogo.tela.blit(self.jogo.pacman.imagem, rectDesenhoPacman)
+        # Se estiver invencível → piscar
+        if self.jogo.pacman.invencivel and self.jogo.pacman.parpadeoToggle:
+            # Não desenha o Pacman nesse frame (efeito de piscar)
+            pass
         else:
-            pygame.draw.circle(
-                self.jogo.tela,
-                cfg.AMARELO,
-                self.jogo.pacman.rect.center,
-                cfg.TILE_SIZE // 2,
+            if self.jogo.pacman.imagem:
+                self.jogo.tela.blit(self.jogo.pacman.imagem, rectDesenhoPacman)
+            else:
+                pygame.draw.circle(
+                    self.jogo.tela,
+                    cfg.AMARELO,
+                    rectDesenhoPacman.center,
+                    cfg.TILE_SIZE // 2,
             )
+
 
         # Desenha todos os fantasmas
         for fantasma in self.jogo.fantasmas:
@@ -191,7 +344,7 @@ class EstadoJogo(Estado):
                 pygame.draw.circle(
                     self.jogo.tela,
                     corFantasma,
-                    fantasma.rect.center,
+                    rectDesenhoFantasma.center,
                     cfg.TILE_SIZE // 2,
                 )
 
@@ -219,6 +372,8 @@ class Jogo:
         self.estado = cfg.estadoJogo.MENU
         # Carrega o mapa
         self.mapa = Mapa("fases/fase1.txt")
+        
+        self.carregar_scores()
 
         # Configuração da tela
         self.larguraTela = self.mapa.col * cfg.TILE_SIZE
@@ -265,6 +420,31 @@ class Jogo:
 
     def mudarEstado(self, novo_estado: Estado) -> None:
         self.estadoAtual = novo_estado
+    
+    def carregar_scores(self):
+        self.scores = []
+        try:
+            with open("scores.txt", "r") as f:
+                for linha in f:
+                    nome, pontos = linha.strip().split(";")
+                    self.scores.append((nome, int(pontos)))
+
+            self.scores.sort(key=lambda x: x[1], reverse=True)
+
+        except FileNotFoundError:
+            self.scores = []
+
+
+    def salvar_score(self, nome, pontos):
+        self.scores.append((nome, pontos))
+        self.scores.sort(key=lambda x: x[1], reverse=True)
+        self.scores = self.scores[:5]  # Top 5 apenas
+
+        with open("scores.txt", "w") as f:
+            for nome, pts in self.scores:
+                f.write(f"{nome};{pts}\n")
+
+
 
     def desenhar(self) -> None:
         self.estadoAtual.desenhar()
@@ -288,8 +468,8 @@ class Jogo:
             # Para garantir consistência, o ideal é chamar desenhar() aqui se o estado não o fizer.
             # No código original, EstadoJogo chama desenhar() no final do update,
             # mas EstadoMenu não chama.
-            if isinstance(self.estadoAtual, EstadoMenu):
-                self.estadoAtual.desenhar()
+            self.estadoAtual.desenhar()
+
 
         pygame.quit()
 

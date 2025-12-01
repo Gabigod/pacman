@@ -3,6 +3,7 @@ import config as cfg
 from mapa import Mapa
 from entidades import Pacman, Fantasma
 import pygame
+import os
 
 
 # Classe Abstrata (Modelo)
@@ -22,6 +23,7 @@ class Estado(ABC):
     def desenhar(self):
         pass
 
+
 class EstadoNome(Estado):
     def __init__(self, jogo, score):
         super().__init__(jogo)
@@ -33,7 +35,7 @@ class EstadoNome(Estado):
             if evento.key == pygame.K_RETURN and len(self.nome) > 0:
                 self.jogo.salvar_score(self.nome, self.score)
                 self.jogo.mudarEstado(EstadoGameOver(self.jogo))
-            
+
             elif evento.key == pygame.K_BACKSPACE:
                 self.nome = self.nome[:-1]
 
@@ -48,16 +50,84 @@ class EstadoNome(Estado):
         self.jogo.tela.fill(cfg.PRETO)
 
         titulo = self.jogo.fonte.render("DIGITE SEU NOME:", True, cfg.AMARELO)
-        rect = titulo.get_rect(center=(self.jogo.larguraTela//2, 200))
+        rect = titulo.get_rect(center=(self.jogo.larguraTela // 2, 200))
         self.jogo.tela.blit(titulo, rect)
 
         nome_txt = self.jogo.fonte.render(self.nome, True, cfg.BRANCO)
-        rect2 = nome_txt.get_rect(center=(self.jogo.larguraTela//2, 260))
+        rect2 = nome_txt.get_rect(center=(self.jogo.larguraTela // 2, 260))
         self.jogo.tela.blit(nome_txt, rect2)
 
-        msg = self.jogo.fonte.render("Pressione ENTER para confirmar", True, cfg.VERMELHO)
-        rect3 = msg.get_rect(center=(self.jogo.larguraTela//2, 320))
+        msg = self.jogo.fonte.render(
+            "Pressione ENTER para confirmar", True, cfg.VERMELHO
+        )
+        rect3 = msg.get_rect(center=(self.jogo.larguraTela // 2, 320))
         self.jogo.tela.blit(msg, rect3)
+
+        pygame.display.flip()
+
+
+class EstadoSeletorFase(Estado):
+    def __init__(self, jogo):
+        super().__init__(jogo)
+        self.diretorio = "fases"
+        # Lista apenas os arquifos .txt no diretório de fases
+        try:
+            self.arquivos = [
+                f for f in os.listdir(self.diretorio) if f.endswith(".txt")
+            ]
+            self.arquivos.sort()  # Ordena alfabeticamente
+
+        except FileNotFoundError:
+            print(f"Erro: Diretório '{self.diretorio}' não encontrado.")
+            self.arquivos = []
+
+        self.indexSelecionado = 0
+
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_ESCAPE:
+                self.jogo.mudarEstado(EstadoMenu(self.jogo))
+
+            elif evento.key == pygame.K_UP:
+                self.indexSelecionado = (self.indexSelecionado - 1) % len(self.arquivos)
+
+            elif evento.key == pygame.K_DOWN:
+                self.indexSelecionado = (self.indexSelecionado + 1) % len(self.arquivos)
+
+            elif evento.key == pygame.K_RETURN:
+                if self.arquivos:
+                    arquivoEscolhido = self.arquivos[self.indexSelecionado]
+                    # Inicia o jogo com o mapa selecionado
+                    self.jogo.mudarEstado(EstadoJogo(self.jogo, arquivoEscolhido))
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        titulo = self.jogo.fonte.render("SELECIONE A FASE", True, cfg.AMARELO)
+        rectTitulo = titulo.get_rect(center=(self.jogo.larguraTela // 2, 50))
+        self.jogo.tela.blit(titulo, rectTitulo)
+
+        if not self.arquivos:
+            msg = self.jogo.fonte.render("Nenhuma fase encontrada!", True, cfg.VERMELHO)
+            self.jogo.tela.blit(msg, (50, 100))
+            return
+
+        # Renderiza a lista de fases
+        yInicial = 120
+        espacamento = 40
+
+        for i, arquivo in enumerate(self.arquivos):
+            cor = cfg.AMARELO if i == self.indexSelecionado else cfg.BRANCO
+            texto = f"> {arquivo}" if i == self.indexSelecionado else arquivo
+
+            render = self.jogo.fonte.render(texto, True, cor)
+            rect = render.get_rect(
+                center=(self.jogo.larguraTela // 2, yInicial + i * espacamento)
+            )
+            self.jogo.tela.blit(render, rect)
 
         pygame.display.flip()
 
@@ -68,7 +138,7 @@ class EstadoMenu(Estado):
         if evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_1:
                 # Troca para o estado de jogo
-                self.jogo.mudarEstado(EstadoJogo(self.jogo))
+                self.jogo.mudarEstado(EstadoSeletorFase(self.jogo))
             elif evento.key == pygame.K_2:
                 print("Carregar Jogo - Não implementado")
             elif evento.key == pygame.K_3:
@@ -100,6 +170,7 @@ class EstadoMenu(Estado):
 
         pygame.display.flip()
 
+
 class EstadoRanking(Estado):
     def processar_eventos(self, evento):
         if evento.type == pygame.KEYDOWN:
@@ -113,24 +184,30 @@ class EstadoRanking(Estado):
         self.jogo.tela.fill(cfg.PRETO)
 
         titulo = self.jogo.fonte.render("RANKING", True, cfg.AMARELO)
-        rect = titulo.get_rect(center=(self.jogo.larguraTela//2, 60))
+        rect = titulo.get_rect(center=(self.jogo.larguraTela // 2, 60))
         self.jogo.tela.blit(titulo, rect)
 
-        # exibir lista de scores
-        y = 120
-        for i, (nome, pontos) in enumerate(self.jogo.scores):
-            texto = self.jogo.fonte.render(f"{i+1}. {nome} — {pontos} pontos", True, cfg.BRANCO)
-            rect = texto.get_rect(center=(self.jogo.larguraTela//2, y))
-            self.jogo.tela.blit(texto, rect)
-            y += 40
+        # Cabeçalho
+        header = self.jogo.fonte.render("Nome      |  Pts  |  Mapa", True, cfg.AZUL)
+        rectH = header.get_rect(center=(self.jogo.larguraTela // 2, 100))
+        self.jogo.tela.blit(header, rectH)
 
-        # instrução
+        y = 140
+        for i, (nome, pontos, mapaNome) in enumerate(self.jogo.scores):
+            # Formatação simples para alinhar
+            textoStr = f"{i + 1}. {nome} - {pontos} - {mapaNome}"
+            texto = self.jogo.fonte.render(textoStr, True, cfg.BRANCO)
+            rect = texto.get_rect(center=(self.jogo.larguraTela // 2, y))
+            self.jogo.tela.blit(texto, rect)
+            y += 30
+
         msg = self.jogo.fonte.render("Pressione ESC para voltar", True, cfg.VERMELHO)
-        rect = msg.get_rect(center=(self.jogo.larguraTela//2, self.jogo.alturaTela - 60))
+        rect = msg.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela - 40)
+        )
         self.jogo.tela.blit(msg, rect)
 
         pygame.display.flip()
-
 
 
 class EstadoGameOver(Estado):
@@ -145,8 +222,6 @@ class EstadoGameOver(Estado):
             elif evento.key == pygame.K_2:
                 self.jogo.mudarEstado(EstadoRanking(self.jogo))
 
-
-
     def update(self):
         pass
 
@@ -154,26 +229,36 @@ class EstadoGameOver(Estado):
         self.jogo.tela.fill(cfg.PRETO)
 
         txt = self.jogo.fonte.render("GAME OVER", True, cfg.VERMELHO)
-        rect = txt.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 - 40))
+        rect = txt.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 - 40)
+        )
         self.jogo.tela.blit(txt, rect)
 
         txt2 = self.jogo.fonte.render("Pressione ENTER para sair", True, cfg.BRANCO)
-        rect2 = txt2.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2))
+        rect2 = txt2.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2)
+        )
         self.jogo.tela.blit(txt2, rect2)
 
         txt3 = self.jogo.fonte.render("Pressione 1 para reiniciar", True, cfg.BRANCO)
-        rect3 = txt3.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 40))
+        rect3 = txt3.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 40)
+        )
         self.jogo.tela.blit(txt3, rect3)
 
-        txt4 = self.jogo.fonte.render("Pressione 2 para ver o Ranking", True, cfg.BRANCO)
-        rect4 = txt4.get_rect(center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 80))
+        txt4 = self.jogo.fonte.render(
+            "Pressione 2 para ver o Ranking", True, cfg.BRANCO
+        )
+        rect4 = txt4.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 80)
+        )
         self.jogo.tela.blit(txt4, rect4)
 
         pygame.display.flip()
 
     def reiniciar_jogo(self):
         # Recarrega o mapa
-        self.jogo.mapa = Mapa("fases/fase1.txt")
+        self.jogo.mudarEstado(EstadoJogo(self.jogo, self.jogo.nomeMapaAtual))
 
         # Reset do Pacman
         px, py = self.jogo.mapa.posicaoInicialPacman
@@ -191,10 +276,14 @@ class EstadoGameOver(Estado):
         # VOLTA ao estado de jogo
         self.jogo.mudarEstado(EstadoJogo(self.jogo))
 
-        
 
 # Estado de Gameplay
 class EstadoJogo(Estado):
+    def __init__(self, jogo, arquivoMapa):
+        super().__init__(jogo)
+        # Carrega o nível utilizando o metodo da classe jogo
+        self.jogo.carregarNivel(arquivoMapa)
+
     def processar_eventos(self, evento):
         if evento.type == pygame.KEYDOWN:
             self.jogo.pacman.processarEvento(evento.key)
@@ -211,7 +300,6 @@ class EstadoJogo(Estado):
             hitbox_fantasma = fantasma.rect.inflate(-10, -10)
 
             if hitbox_pacman.colliderect(hitbox_fantasma):
-
                 # Se o PACMAN estiver invencível, ignorar colisões
                 if self.jogo.pacman.invencivel:
                     continue
@@ -230,7 +318,9 @@ class EstadoJogo(Estado):
 
                     # Se acabou as vidas → GAME OVER
                     if self.jogo.pacman.vidas <= 0:
-                        self.jogo.mudarEstado(EstadoNome(self.jogo, self.jogo.pacman.pontos))
+                        self.jogo.mudarEstado(
+                            EstadoNome(self.jogo, self.jogo.pacman.pontos)
+                        )
                         return
 
                     # SENÃO → reset posição
@@ -243,7 +333,6 @@ class EstadoJogo(Estado):
                     # Ativa invencibilidade temporária
                     self.jogo.pacman.invencivel = True
                     self.jogo.pacman.invencivelTimer = 120  # 2 segundos (60 fps)
-
 
             # Lógica de comer pontos (baseada na grade)
             if self.jogo.pacman.esta_centralizado():
@@ -330,8 +419,7 @@ class EstadoJogo(Estado):
                     cfg.AMARELO,
                     rectDesenhoPacman.center,
                     cfg.TILE_SIZE // 2,
-            )
-
+                )
 
         # Desenha todos os fantasmas
         for fantasma in self.jogo.fantasmas:
@@ -370,9 +458,10 @@ class Jogo:
     # Inicializa o jogo
     def __init__(self) -> None:
         self.estado = cfg.estadoJogo.MENU
-        # Carrega o mapa
+        # Carrega o primeiro mapa para modelar a janela (gambiarra, o correto seria ter um padrão)
         self.mapa = Mapa("fases/fase1.txt")
-        
+        self.nomeMapaAtual = "fase1.txt"
+
         self.carregar_scores()
 
         # Configuração da tela
@@ -400,51 +489,81 @@ class Jogo:
             print(f"Erro ao carregar sprites: {e}")
             self.folhaSprites = None
 
-        # Instancia o objeto pacman
+        # Define o estado inicial
+        self.estadoAtual = EstadoMenu(self)
+
+        # # Instancia o objeto pacman
+        # if self.mapa.posicaoInicialPacman:
+        #     px, py = self.mapa.posicaoInicialPacman
+        #     self.pacman = Pacman(px, py, self.folhaSprites)
+        # else:
+        #     print("ERRO: Posição inicial do Pacman não encontrada no mapa!")
+        #     # Posição padrão segura ou sair
+        #     self.pacman = Pacman(1, 1, self.folhaSprites)
+        #
+        # # Instancia os fantasmas
+        # self.fantasmas = []
+        # for fx, fy in self.mapa.posicaoInicialFantasmas:
+        #     fantasma = Fantasma(fx, fy, self.folhaSprites)
+        #     self.fantasmas.append(fantasma)
+
+    # Lógica para carregar o mapa
+    def carregarNivel(self, nomeArquivo):
+        caminho = f"fases/{nomeArquivo}"
+        self.nomeMapaAtual = nomeArquivo  # Salva para o ranking
+        self.mapa = Mapa(caminho)
+
+        # Redimensiona tela se necessário (caso os mapas tenham tamanhos diferentes)
+        novaLargura = self.mapa.col * cfg.TILE_SIZE
+        novaAltura = (self.mapa.lin + 1) * cfg.TILE_SIZE
+        if novaLargura != self.larguraTela or novaAltura != self.alturaTela:
+            self.larguraTela = novaLargura
+            self.alturaTela = novaAltura
+            self.tela = pygame.display.set_mode((self.larguraTela, self.alturaTela))
+
+        # Reset do Pacman
         if self.mapa.posicaoInicialPacman:
             px, py = self.mapa.posicaoInicialPacman
             self.pacman = Pacman(px, py, self.folhaSprites)
         else:
-            print("ERRO: Posição inicial do Pacman não encontrada no mapa!")
-            # Posição padrão segura ou sair
             self.pacman = Pacman(1, 1, self.folhaSprites)
 
-        # Instancia os fantasmas
+        # Reset dos fantasmas
         self.fantasmas = []
         for fx, fy in self.mapa.posicaoInicialFantasmas:
-            fantasma = Fantasma(fx, fy, self.folhaSprites)
-            self.fantasmas.append(fantasma)
+            self.fantasmas.append(Fantasma(fx, fy, self.folhaSprites))
 
-        # Define o estado inicial
-        self.estadoAtual = EstadoMenu(self)
+        self.powerupAtivo = False
+        self.powerupTimer = 0
 
     def mudarEstado(self, novo_estado: Estado) -> None:
         self.estadoAtual = novo_estado
-    
+
     def carregar_scores(self):
         self.scores = []
         try:
             with open("scores.txt", "r") as f:
                 for linha in f:
-                    nome, pontos = linha.strip().split(";")
-                    self.scores.append((nome, int(pontos)))
+                    partes = linha.strip().split(";")
+                    if len(partes) == 3:
+                        nome, pontos, mapaNome = partes
+                        self.scores.append((nome, int(pontos), mapaNome))
+                    elif len(partes) == 2:  # Retrocompatibilidade
+                        nome, pontos = partes
+                        self.scores.append((nome, int(pontos), "Desconhecido"))
 
             self.scores.sort(key=lambda x: x[1], reverse=True)
-
         except FileNotFoundError:
             self.scores = []
 
-
     def salvar_score(self, nome, pontos):
-        self.scores.append((nome, pontos))
+        self.scores.append((nome, pontos, self.nomeMapaAtual))
         self.scores.sort(key=lambda x: x[1], reverse=True)
-        self.scores = self.scores[:5]  # Top 5 apenas
+        self.scores = self.scores[:10]  # Top 10
 
         with open("scores.txt", "w") as f:
-            for nome, pts in self.scores:
-                f.write(f"{nome};{pts}\n")
-
-
+            for nome, pts, mapaNome in self.scores:
+                f.write(f"{nome};{pts};{mapaNome}\n")
 
     def desenhar(self) -> None:
         self.estadoAtual.desenhar()
@@ -469,7 +588,6 @@ class Jogo:
             # No código original, EstadoJogo chama desenhar() no final do update,
             # mas EstadoMenu não chama.
             self.estadoAtual.desenhar()
-
 
         pygame.quit()
 

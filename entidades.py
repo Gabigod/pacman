@@ -27,6 +27,14 @@ class Entidade:
         self.animacaoIndex = 0.0  # Índice para animação futura
         self.animacaoSpeed = 0.15  # Velocidade da animação futura
 
+    # Metodo para limpar as animações para permitir o salvamento
+    def limparImagens(self):
+        self.imagem = None
+
+    def restaurarImagem(self):
+        # A implementação das classes filhas sobrepoe
+        pass
+
     # Reorna a posição atual na grade baseada no centro do rect
     def getPosGrad(self) -> int:
         cx = self.rect.centerx // TILE_SIZE
@@ -89,6 +97,22 @@ class Pacman(Entidade):
 
         self.imagem = self.sprites[0]
         self.animacaoSpeed = 0.3  # Pacman mastiga rápido
+
+    # Limpa as animações para salvar
+    def limparImagens(self):
+        self.imagem = None
+        self.sprites = []  # Listas de surfaces também quebram o pickle
+
+    # Reestabelesce as animações
+    def restaurarImagens(self, sheet):
+        if sheet:
+            s0 = self.getSprite(sheet, 0, 0)
+            s1 = self.getSprite(sheet, 16, 0)
+            s2 = self.getSprite(sheet, 32, 0)
+            self.sprites = [s0, s1, s2, s1]
+            self.imagem = self.sprites[0]  # Define uma imagem padrão
+        else:
+            self.sprites = []
 
     # Chamado pelo evento de teclado para definir a direção desejada
     def processarEvento(self, key):
@@ -158,6 +182,7 @@ class Pacman(Entidade):
             self.imagem = pygame.transform.rotate(
                 spriteBase, angulo
             )  # Gira a partir da original conforme o angulo
+
     def desenhar(self, tela):
         # Se estiver invencível e for um frame "invisível", NÃO desenha
         if self.invencivel and self.parpadeoToggle:
@@ -165,6 +190,7 @@ class Pacman(Entidade):
 
         # Caso contrário, desenha normalmente
         tela.blit(self.imagem, self.rect)
+
     def morrer(self):
         # perde 1 vida
         self.vidas -= 1
@@ -182,7 +208,6 @@ class Pacman(Entidade):
         self.parpadeoToggle = False
 
         return False
-   
 
 
 # Subclasse específica para os Fantasmas
@@ -206,6 +231,25 @@ class Fantasma(Entidade):
                 self.getSprite(sheet, 16, 64),
             ]
             # Assustado (Azul): (128, 64) e (144, 64)
+            self.framesAssustado = [
+                self.getSprite(sheet, 128, 64),
+                self.getSprite(sheet, 144, 64),
+            ]
+            self.imagem = self.framesNormal[0]
+
+    # Limpa as animações para salvar
+    def limparImagens(self):
+        self.imagem = None
+        self.framesNormal = []
+        self.framesAssustado = []
+
+    # Reestabelesce as animações
+    def restaurarImagens(self, sheet):
+        if sheet:
+            self.framesNormal = [
+                self.getSprite(sheet, 0, 64),
+                self.getSprite(sheet, 16, 64),
+            ]
             self.framesAssustado = [
                 self.getSprite(sheet, 128, 64),
                 self.getSprite(sheet, 144, 64),

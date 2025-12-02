@@ -1,0 +1,3 @@
+Gustavo;3800;fase1.txt
+Gabriel;3600;fase1.txt
+Luiza;2400;fase2.txt

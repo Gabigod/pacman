@@ -327,13 +327,38 @@ class Fantasma(Entidade):
 
         # Verifica se está centralizado para decidir o próximo movimento
         if self.esta_centralizado():
+            target_x = 0
+            target_y = 0
+
             if self.assustado:
-                # inversão do alvo → fugir do Pacman
-                alvoX = (self.xGrid * 2) - pacman.xGrid
-                alvoY = (self.yGrid * 2) - pacman.yGrid
-                prox = self.bfsProx(mapa, alvoX, alvoY)
+                # --- MODO FUGIR ---
+                target_x = (self.xGrid * 2) - pacman.xGrid
+                target_y = (self.yGrid * 2) - pacman.yGrid
             else:
-                prox = self.bfsProx(mapa, pacman.xGrid, pacman.yGrid)
+                # Calcula a "Distância de Manhattan" (soma das diferenças x e y)
+                distancia = abs(self.xGrid - pacman.xGrid) + abs(
+                    self.yGrid - pacman.yGrid
+                )
+
+                # --- MODO ATAQUE FINAL ---
+                if distancia < 5:
+                    target_x = pacman.xGrid
+                    target_y = pacman.yGrid
+                else:
+                    # --- MODO PERSEGUIR ---
+                    # Se estiver longe, mantém o offset para evitar empilhamento
+                    offset_x = (id(self) % 5) - 2
+                    offset_y = (id(self) % 3) - 1
+
+                    target_x = pacman.xGrid + offset_x
+                    target_y = pacman.yGrid + offset_y
+
+            # --- SEGURANÇA (CLAMP) ---
+            target_x = max(0, min(target_x, mapa.col - 1))
+            target_y = max(0, min(target_y, mapa.lin - 1))
+
+            # --- BUSCA DO CAMINHO ---
+            prox = self.bfsProx(mapa, target_x, target_y)
 
             if prox:
                 px, py = prox
@@ -341,10 +366,9 @@ class Fantasma(Entidade):
                 dy = py - self.yGrid
                 self.direcao = (dx, dy)
             else:
+                # Fallback: Se não achar caminho, escolhe um vizinho aleatório válido
                 vizinhos = mapa.vizinhos(self.xGrid, self.yGrid)
                 if vizinhos:
-                    px, py = random.choice(
-                        vizinhos
-                    )  # Se BFS retornou None, escolhe um vizinho aleatório para seguir
+                    px, py = random.choice(vizinhos)
                     self.direcao = (px - self.xGrid, py - self.yGrid)
         self.mover_fisica()

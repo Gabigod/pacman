@@ -12,6 +12,7 @@ class Mapa:
         self.posicaoInicialPacman = None  # Posição inicial do Pacman
         self.posicaoInicialFantasmas = []  # Lista de fantasmas
         self.posicaoPowerUp = None  # Power-up (0)
+        self.pontosRestantes = 0  # Usado para verifiacar a vitória
         self.carregarMapa(arquivo)
 
     # Método para carregar o mapa a partir de um arquivo .txt
@@ -21,6 +22,7 @@ class Mapa:
         self.posicaoInicialFantasmas = []
         self.posicaoPowerUp = None
         self.matriz = []
+        self.pontosRestantes = 0
 
         # Verifica se o arquivo existe
         if not os.path.exists(arquivo):
@@ -50,20 +52,24 @@ class Mapa:
                     for j, char in enumerate(listaChars):
                         # PACMAN (4 direções possíveis no TXT)
                         if char in ["<", ">", "^", "v"]:
-                            print(f"PACMAN ENCONTRADO EM: ({j}, {linha_index})")
+                            # print(f"PACMAN ENCONTRADO EM: ({j}, {linha_index})")
                             self.posicaoInicialPacman = (j, linha_index)
                             listaChars[j] = "."  # Pacman começa sobre um ponto
+                            self.pontosRestantes += 1
 
                         # FANTASMA
                         elif char == "F":
-                            print(f"FANTASMA ENCONTRADO EM: ({j}, {linha_index})")
+                            # print(f"FANTASMA ENCONTRADO EM: ({j}, {linha_index})")
                             self.posicaoInicialFantasmas.append((j, linha_index))
                             listaChars[j] = " "  # Fantasma não é chão nem ponto
 
                         # POWER-UP (o caractere '0')
                         elif char == "0":
-                            print(f"POWER-UP ENCONTRADO EM: ({j}, {linha_index})")
+                            # print(f"POWER-UP ENCONTRADO EM: ({j}, {linha_index})")
                             self.posicaoPowerUp = (j, linha_index)
+                            self.pontosRestantes += 1
+                        elif char == ".":
+                            self.pontosRestantes += 1
 
                     # Linha final sem entidades
                     self.matriz.append(listaChars)

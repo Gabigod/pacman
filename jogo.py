@@ -25,6 +25,54 @@ class Estado(ABC):
         pass
 
 
+class EstadoVitoria(Estado):
+    def processar_eventos(self, evento):
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_RETURN:
+                # Vai para a tela de registrar nome no Ranking
+                self.jogo.mudarEstado(EstadoNome(self.jogo, self.jogo.pacman.pontos))
+
+    def update(self):
+        pass
+
+    def desenhar(self):
+        self.jogo.tela.fill(cfg.PRETO)
+
+        # Título
+        titulo = self.jogo.fonte.render("PARABÉNS!", True, cfg.AMARELO)
+        rectT = titulo.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 - 40)
+        )
+        self.jogo.tela.blit(titulo, rectT)
+
+        # Subtítulo
+        msg = self.jogo.fonte.render("Você completou o nível!", True, cfg.BRANCO)
+        rectM = msg.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2)
+        )
+        self.jogo.tela.blit(msg, rectM)
+
+        # Score Final
+        score = self.jogo.fonte.render(
+            f"Score Final: {self.jogo.pacman.pontos}", True, cfg.AZUL
+        )
+        rectS = score.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 40)
+        )
+        self.jogo.tela.blit(score, rectS)
+
+        # Instrução
+        info = self.jogo.fonte.render(
+            "Pressione ENTER para continuar", True, cfg.VERMELHO
+        )
+        rectI = info.get_rect(
+            center=(self.jogo.larguraTela // 2, self.jogo.alturaTela // 2 + 80)
+        )
+        self.jogo.tela.blit(info, rectI)
+
+        pygame.display.flip()
+
+
 class EstadoPause(Estado):
     def processar_eventos(self, evento):
         if evento.type == pygame.KEYDOWN:
@@ -44,9 +92,6 @@ class EstadoPause(Estado):
         pass
 
     def desenhar(self):
-        # (opcional, se quiser fundo transparente)
-        self.jogo.estadoAnterior.desenhar()
-
         # Sobreposição simples preta
         self.jogo.tela.fill(cfg.PRETO)
 
@@ -487,17 +532,19 @@ class EstadoJogo(Estado):
             # Lógica de comer pontos (baseada na grade)
             if self.jogo.pacman.esta_centralizado():
                 px, py = self.jogo.pacman.getPosGrad()
-                # Verifica limites para evitar crash se sair do mapa
+                # Verifica limites para evitar sair do mapa
                 if 0 <= py < self.jogo.mapa.lin and 0 <= px < self.jogo.mapa.col:
                     item = self.jogo.mapa.matriz[py][px]
 
                     if item == ".":
                         self.jogo.mapa.matriz[py][px] = " "
                         self.jogo.pacman.pontos += 10
+                        self.jogo.mapa.pontosRestantes -= 1  # Decrementa
 
                     elif item == "0":  # POWERUP
                         self.jogo.mapa.matriz[py][px] = " "
                         self.jogo.pacman.pontos += 50
+                        self.jogo.mapa.pontosRestantes -= 1  # Decrementa
 
                         # Ativa powerup (no objeto jogo)
                         self.jogo.powerupAtivo = True
@@ -507,6 +554,13 @@ class EstadoJogo(Estado):
                         for f in self.jogo.fantasmas:
                             f.assustado = True
                             f.speed = 1  # mais lentos
+
+                    # --- Verifica a vitoria ---
+                    if self.jogo.mapa.pontosRestantes <= 0:
+                        # Adiciona um bônus por completar a fase
+                        self.jogo.pacman.pontos += 1000
+                        self.jogo.mudarEstado(EstadoVitoria(self.jogo))
+                        return  # Para o update atual
 
             # Timer do powerup
             if self.jogo.powerupAtivo:
@@ -607,7 +661,6 @@ class EstadoJogo(Estado):
 class Jogo:
     # Inicializa o jogo
     def __init__(self) -> None:
-        self.estado = cfg.estadoJogo.MENU
         # Carrega o primeiro mapa para modelar a janela (gambiarra, o correto seria ter um padrão)
         self.mapa = Mapa("fases/fase1.txt")
         self.nomeMapaAtual = "fase1.txt"
@@ -640,6 +693,13 @@ class Jogo:
             self.folhaSprites = None
 
         # Define o estado inicial
+        self.estadoAtual = EstadoMenu(self)
+
+        # Inicializa pacman e fantasmas vazios (serão criados no carregarNivel)
+        self.pacman = None
+        self.fantasmas = []
+
+        # Define o estado inicial diretamente usando a Classe, não o Enum
         self.estadoAtual = EstadoMenu(self)
 
     # Método para salvar o estado atual do jogo

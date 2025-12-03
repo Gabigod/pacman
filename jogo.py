@@ -116,7 +116,7 @@ class EstadoPause(Estado):
 class EstadoSalvar(Estado):
     def __init__(self, jogo):
         super().__init__(jogo)
-        self.nomeArquivo = "save1"  # Nome padrão
+        self.nomeArquivo = "save"  # Nome padrão
 
     def processar_eventos(self, evento):
         if evento.type == pygame.KEYDOWN:
@@ -407,7 +407,7 @@ class EstadoGameOver(Estado):
                 self.jogo.rodando = False
 
             elif evento.key == pygame.K_1:
-                self.reiniciar_jogo()
+                self.jogo.mudarEstado(EstadoJogo(self.jogo, self.jogo.nomeMapaAtual))
 
             elif evento.key == pygame.K_2:
                 self.jogo.mudarEstado(EstadoRanking(self.jogo))
@@ -464,7 +464,7 @@ class EstadoGameOver(Estado):
         self.jogo.powerupTimer = 0
 
         # VOLTA ao estado de jogo
-        self.jogo.mudarEstado(EstadoJogo(self.jogo))
+        self.jogo.mudarEstado(EstadoJogo(self.jogo, self.jogo.nomeMapaAtual))
 
 
 # Estado de Gameplay
@@ -714,12 +714,12 @@ class Jogo:
 
         caminhoCompleto = os.path.join(caminhoDir, nomeArquivo)
 
-        # 1. Preparar objetos (remover imagens que não podem ser salvas)
+        # Preparar objetos (remover imagens que não podem ser salvas)
         self.pacman.limparImagens()
         for f in self.fantasmas:
             f.limparImagens()
 
-        # 2. Coletar dados do estado atual
+        # Coletar dados do estado atual
         dados = {
             "mapa": self.mapa,
             "pacman": self.pacman,
@@ -781,7 +781,7 @@ class Jogo:
             estadoJ = EstadoJogo(self, self.nomeMapaAtual)
             # O construtor do EstadoJogo chama carregarNivel, o que RESETARIA o jogo.
             # Precisamos evitar isso ou ajustar o EstadoJogo.
-            # Vamos modificar levemente a criação do estado ou apenas setar o estado
+            # temos que modificar levemente a criação do estado ou apenas setar o estado
             # e forçar os objetos que acabamos de carregar.
 
             # Como o EstadoJogo chama self.jogo.carregarNivel no __init__,
